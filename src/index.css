@@ -1,0 +1,6 @@
+@tailwind base; /* Adiciona os estilos base e resets do Tailwind */
+@tailwind components; /* Adiciona quaisquer classes de componentes pré-definidas pelo Tailwind ou por plugins. */
+@tailwind utilities;  /* Adiciona todas as classes utilitárias do Tailwind (como text-red-500, mt-4, flex, etc.) que você usará para estilizar seus componentes.*/
+
+
+
