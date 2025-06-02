@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import InputField from '../components/common/InputField';
 import Button from '../components/common/Button';
-
-// import { Link } from 'react-router-dom'; // Para o link "Não tem uma conta? Cadastre-se"
-// Comentado o <Link to="/cadastro">...&lt;/Link> porque você precisará ter o react-router-dom configurado e o componente Link importado para ele funcionar. Mas a estrutura está aí.
+import { Link, useNavigate } from 'react-router-dom'; // Importe useNavigate e Link
+import { loginUser } from '../services/authService'; // Importe nossa função de serviço de login
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false); // Estado para feedback de carregamento
+    const [error, setError] = useState(''); // Estado para mensagens de erro da API
+
+    const navigate = useNavigate(); // Hook para navegação
 
     const handleChange = (event) => {
         const { name, value } = event.target;
+        setError(''); // Limpa erros anteriores ao digitar
         if (name === 'email') {
             setEmail(value);
         } else if (name === 'password') {
@@ -18,47 +22,92 @@ const LoginPage = () => {
         }
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => { // Transforme em async
         event.preventDefault();
-        // Agora você tem acesso a 'email' e 'password' aqui
-        console.log('Dados do Login:', { email, password });
-        // A lógica de chamada à API virá aqui no próximo passo
+        setError(''); // Limpa erros anteriores
+        setIsLoading(true); // Ativa o estado de carregamento
+
+        // Dentro do handleSubmit, antes do try...catch
+        const payload = { email, password }; // Para Login. 
+        // Para Register, se tiver confirmPassword, seria só { email, password }
+        // pois o backend UserCreate só espera email e password.
+        console.log('Dados que serão enviados para a API:', payload);
+        setIsLoading(true);
+        
+        try {
+            const credentials = { email, password };
+            const responseData = await loginUser(credentials); // Chama a API de login
+
+            console.log('Login bem-sucedido, token:', responseData.access_token);
+            alert('Login realizado com sucesso! Você será redirecionado para o dashboard.');
+
+            // O token já foi salvo no localStorage pela função loginUser no authService.js
+            // Futuramente, aqui também atualizaremos o AuthContext
+
+            navigate('/dashboard'); // Redireciona para a página de dashboard
+
+        } catch (apiError) {
+            console.error('Erro na API:', apiError); // Logue o erro completo para debug
+            let displayErrorMessage = 'Ocorreu um erro. Tente novamente.'; // Mensagem padrão
+
+            if (apiError.detail) {
+                if (Array.isArray(apiError.detail)) {
+                    // Se 'detail' for um array de erros (comum para erros de validação do Pydantic)
+                    // Vamos pegar a mensagem do primeiro erro para simplificar
+                    displayErrorMessage = apiError.detail[0].msg || 'Erro de validação.';
+                } else if (typeof apiError.detail === 'string') {
+                    // Se 'detail' for uma string (como nossos erros customizados "Email ou senha incorretos")
+                    displayErrorMessage = apiError.detail;
+                }
+                // Se apiError.detail for um objeto único, você pode querer extrair a msg dele também,
+                // mas o padrão do FastAPI para ValidationError é um array em 'detail'.
+            } else if (apiError.message) {
+                // Se não houver 'detail', mas houver 'message' (ex: Network Error)
+                displayErrorMessage = apiError.message;
+            }
+
+            setError(displayErrorMessage);
+            alert(`Erro: ${displayErrorMessage}`); // O alert também deve mostrar uma string
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    // ... (return jsx)
-
-
-return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        <div className="p-8 bg-white shadow-md rounded-lg w-full max-w-md">
-            <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login - Orkestre Agenda</h2>
-            <form onSubmit={handleSubmit}>
-                <InputField
-                    label="Email"
-                    type="email"
-                    name="email" // Importante para o handleChange genérico
-                    placeholder="seuemail@example.com"
-                    value={email} // Conecta ao estado 'email'
-                    onChange={handleChange} // Chama handleChange quando o valor mudar
-                />
-                <InputField
-                    label="Senha"
-                    type="password"
-                    name="password" // Importante para o handleChange genérico
-                    placeholder="********"
-                    value={password} // Conecta ao estado 'password'
-                    onChange={handleChange} // Chama handleChange quando o valor mudar
-                />
-                <Button type="submit" className="w-full mt-6">
-                    Entrar
-                </Button>
-            </form>
-            <p className="text-center text-sm text-gray-600 mt-4">
-                Não tem uma conta? {/* <Link to="/cadastro" className="text-blue-500 hover:text-blue-700">Cadastre-se</Link> */}
-            </p>
-            {/* Você pode adicionar um link para "Esqueci minha senha" aqui no futuro também */}
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+            <div className="p-8 bg-white shadow-md rounded-lg w-full max-w-md">
+                <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login - Orkestre Agenda</h2>
+                {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>} {/* Mostra mensagem de erro */}
+                <form onSubmit={handleSubmit}>
+                    <InputField
+                        label="Email"
+                        type="email"
+                        name="email"
+                        placeholder="seuemail@example.com"
+                        value={email}
+                        onChange={handleChange}
+                        disabled={isLoading} // Desabilita input durante o carregamento
+                    />
+                    <InputField
+                        label="Senha"
+                        type="password"
+                        name="password"
+                        placeholder="********"
+                        value={password}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                    />
+                    <Button type="submit" className="w-full mt-6" disabled={isLoading}>
+                        {isLoading ? 'Entrando...' : 'Entrar'} {/* Feedback no botão */}
+                    </Button>
+                </form>
+                <p className="text-center text-sm text-gray-600 mt-4">
+                    Não tem uma conta? <Link to="/cadastro" className="text-blue-500 hover:text-blue-700">Cadastre-se</Link>
+                </p>
+                {/* Adicionar link "Esqueci minha senha" no futuro */}
+            </div>
         </div>
-    </div>
-);
+    );
 };
+
 export default LoginPage;
