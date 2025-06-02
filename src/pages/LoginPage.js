@@ -3,6 +3,7 @@ import InputField from '../components/common/InputField';
 import Button from '../components/common/Button';
 import { Link, useNavigate } from 'react-router-dom'; // Importe useNavigate e Link
 import { loginUser } from '../services/authService'; // Importe nossa função de serviço de login
+import { useAuth } from '../contexts/AuthContext'; // Importe o hook useAuth
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -11,6 +12,8 @@ const LoginPage = () => {
     const [error, setError] = useState(''); // Estado para mensagens de erro da API
 
     const navigate = useNavigate(); // Hook para navegação
+
+    const { login } = useAuth();
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -33,18 +36,21 @@ const LoginPage = () => {
         // pois o backend UserCreate só espera email e password.
         console.log('Dados que serão enviados para a API:', payload);
         setIsLoading(true);
-        
+
         try {
             const credentials = { email, password };
             const responseData = await loginUser(credentials); // Chama a API de login
 
-            console.log('Login bem-sucedido, token:', responseData.access_token);
-            alert('Login realizado com sucesso! Você será redirecionado para o dashboard.');
-
-            // O token já foi salvo no localStorage pela função loginUser no authService.js
-            // Futuramente, aqui também atualizaremos o AuthContext
-
-            navigate('/dashboard'); // Redireciona para a página de dashboard
+            // Agora, em vez de salvar no localStorage aqui, chamamos a função login do AuthContext
+            if (responseData && responseData.access_token) {
+                login(responseData.access_token); // <<<--- CHAME A FUNÇÃO LOGIN DO CONTEXTO AQUI
+                console.log('Login bem-sucedido, token passado para AuthContext:', responseData.access_token);
+                alert('Login realizado com sucesso! Você será redirecionado para o dashboard.');
+                navigate('/dashboard'); // Redireciona para a página de dashboard
+            } else {
+                // Caso a API não retorne o token esperado, mesmo com sucesso na chamada
+                throw new Error('Token de acesso não recebido da API.');
+            }
 
         } catch (apiError) {
             console.error('Erro na API:', apiError); // Logue o erro completo para debug

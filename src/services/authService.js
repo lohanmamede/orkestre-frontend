@@ -13,16 +13,17 @@ const registerUser = async (userData) => {
 };
 
 const loginUser = async (credentials) => {
-  // credentials deve ser um objeto como { email: "...", password: "..." }
   try {
     const response = await apiClient.post('/auth/login', credentials);
     // response.data deve conter { access_token: "...", token_type: "bearer" }
-    if (response.data.access_token) {
-      // Armazenar o token (faremos isso de forma mais robusta depois)
-      localStorage.setItem('orkestreToken', response.data.access_token);
-      console.log("Token armazenado:", response.data.access_token);
-    }
-    return response.data;
+
+    // REMOVA ou COMENTE a linha abaixo, pois o AuthContext cuidará disso:
+    // if (response.data.access_token) {
+    //   localStorage.setItem('orkestreToken', response.data.access_token);
+    //   console.log("Token armazenado:", response.data.access_token);
+    // }
+
+    return response.data; // Apenas retorne os dados da resposta
   } catch (error) {
     console.error("Erro no login:", error.response ? error.response.data : error.message);
     throw error.response ? error.response.data : new Error('Erro ao fazer login');
