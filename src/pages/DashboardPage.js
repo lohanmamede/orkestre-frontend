@@ -4,7 +4,7 @@ import InputField from '../components/common/InputField'
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
-import { getServicesByEstablishment, createServiceForEstablishment, updateService } from '../services/serviceService'; // Importe o serviço
+import { getServicesByEstablishment, createServiceForEstablishment, updateService, deleteService } from '../services/serviceService'; // Importe o serviço
 
 const DashboardPage = () => {
   const { token, logout, isAuthenticated } = useAuth();
@@ -22,6 +22,12 @@ const DashboardPage = () => {
   // Novos estados para controle de edição
   const [isEditing, setIsEditing] = useState(false); // Novo estado: true se estivermos editando, false se adicionando
   const [editingServiceId, setEditingServiceId] = useState(null); // Novo estado: ID do serviço que está sendo editado
+  // Estados para controle de exclusão
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deletingServiceId, setDeletingServiceId] = useState(null);
+  const [isDeletingService, setIsDeletingService] = useState(false);
+  const [deleteServiceError, setDeleteServiceError] = useState('');
+
 
   // Defina o ID do estabelecimento para teste por enquanto
   // No futuro, este ID virá do usuário logado/AuthContext
@@ -171,6 +177,42 @@ const DashboardPage = () => {
     setCreateServiceError('');
   };
 
+  const handleAttemptDelete = (serviceId) => {
+    setDeletingServiceId(serviceId);
+    setShowDeleteConfirmModal(true);
+    setDeleteServiceError(''); // Limpa erros anteriores
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirmModal(false);
+    setDeletingServiceId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingServiceId) return;
+
+    setIsDeletingService(true);
+    setDeleteServiceError('');
+
+    try {
+      await deleteService(deletingServiceId); // Chama a API para deletar
+      // Atualiza a lista de serviços no estado, removendo o serviço deletado
+      setServices(prevServices =>
+        prevServices.filter(s => s.id !== deletingServiceId)
+      );
+      alert('Serviço excluído com sucesso!');
+      handleCancelDelete(); // Fecha o modal e reseta os IDs
+
+    } catch (error) {
+      console.error("Erro ao excluir serviço:", error);
+      setDeleteServiceError(error.detail || error.message || 'Falha ao excluir serviço.');
+      // Poderia mostrar o erro no modal ou como um alerta geral
+      alert(`Erro ao excluir: ${error.detail || error.message || 'Falha ao excluir serviço.'}`);
+    } finally {
+      setIsDeletingService(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -216,6 +258,12 @@ const DashboardPage = () => {
                       className="bg-yellow-500 hover:bg-yellow-700 text-white text-sm py-1 px-2 rounded mt-2"
                     >
                       Editar
+                    </Button>
+                    <Button
+                      onClick={() => handleAttemptDelete(service.id)}
+                      className="bg-red-500 hover:bg-red-700 text-white text-sm py-1 px-2 rounded mt-2 ml-2" // Adicionei ml-2 para espaçamento
+                    >
+                      Excluir
                     </Button>
                   </li>
 
@@ -292,6 +340,39 @@ const DashboardPage = () => {
         // Este trecho não deveria ser alcançado se a rota estiver protegida corretamente
         <p>Você não está logado. Por favor, <a href="/login" className="text-blue-500 hover:text-blue-700">faça login</a>.</p>
       )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+      <div className="p-8 border w-96 shadow-lg rounded-md bg-white">
+        <div className="text-center">
+          <h3 className="text-2xl font-bold text-gray-900">Confirmar Exclusão</h3>
+          <p className="text-sm text-gray-500 mt-2 mb-4">
+            Você tem certeza que deseja excluir este serviço? <br/>
+            Esta ação não pode ser desfeita.
+          </p>
+          {deleteServiceError && <p className="text-red-500 text-sm mb-4">{deleteServiceError}</p>}
+          <div className="flex justify-center space-x-4">
+            <Button 
+              onClick={handleCancelDelete}
+              className="bg-gray-300 hover:bg-gray-400 text-gray-800"
+              disabled={isDeletingService}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeletingService}
+            >
+              {isDeletingService ? 'Excluindo...' : 'Confirmar Exclusão'}
+            </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
     </div>
   );
 };
@@ -326,4 +407,9 @@ Resumo das Mudanças: Edição de Serviços
 - Função handleCancelEdit para limpar o formulário e sair do modo de edição.
 - Formulário e botão de submit adaptados para funcionar tanto para criar quanto para editar.
 
+
+Exclusão de Serviços
+- handleAttemptDelete(serviceId): Chamada quando o botão "Excluir" é clicado. Ela vai guardar o ID do serviço a ser excluído e abrir o modal de confirmação.
+- handleConfirmDelete(): Chamada quando o usuário confirma a exclusão no modal. Ela chamará o serviço da API.
+- handleCancelDelete(): Chamada para fechar o modal sem excluir.
 */
