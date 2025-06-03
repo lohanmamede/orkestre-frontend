@@ -4,8 +4,7 @@ import InputField from '../components/common/InputField'
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
-import { getServicesByEstablishment, createServiceForEstablishment } from '../services/serviceService'; // Importe o serviço
-
+import { getServicesByEstablishment, createServiceForEstablishment, updateService } from '../services/serviceService'; // Importe o serviço
 
 const DashboardPage = () => {
   const { token, logout, isAuthenticated } = useAuth();
@@ -20,6 +19,9 @@ const DashboardPage = () => {
   const [newServiceDuration, setNewServiceDuration] = useState('');
   const [isCreatingService, setIsCreatingService] = useState(false);
   const [createServiceError, setCreateServiceError] = useState('');
+  // Novos estados para controle de edição
+  const [isEditing, setIsEditing] = useState(false); // Novo estado: true se estivermos editando, false se adicionando
+  const [editingServiceId, setEditingServiceId] = useState(null); // Novo estado: ID do serviço que está sendo editado
 
   // Defina o ID do estabelecimento para teste por enquanto
   // No futuro, este ID virá do usuário logado/AuthContext
@@ -90,7 +92,84 @@ const DashboardPage = () => {
     }
   };
 
+  // Função para iniciar a edição de um serviço
+  // Esta função será chamada quando o usuário clicar em "Editar" em um serviço
+  const handleStartEdit = (serviceToEdit) => {
+    setIsEditing(true); // Entra no modo de edição
+    setEditingServiceId(serviceToEdit.id); // Guarda o ID do serviço
 
+    // Preenche os campos do formulário com os dados do serviço selecionado
+    setNewServiceName(serviceToEdit.name);
+    setNewServiceDescription(serviceToEdit.description || ''); // Garante que não seja null
+    setNewServicePrice(serviceToEdit.price.toString()); // Converte para string para o input number
+    setNewServiceDuration(serviceToEdit.duration_minutes.toString()); // Converte para string
+    // Você pode querer limpar o createServiceError aqui também
+    setCreateServiceError('');
+
+    // Opcional: rolar a tela para o formulário, se ele estiver longe
+    // window.scrollTo({ top: document.getElementById('service-form-section').offsetTop, behavior: 'smooth' });
+  };
+
+  // Função para atualizar um serviço
+  // Esta função será chamada quando o usuário submeter o formulário de edição
+  // Ela reutiliza a lógica de criação, mas com o ID do serviço a ser atualizado
+  // Lógica: Similar ao handleCreateService, mas chama updateService e atualiza o serviço existente na lista do estado services.
+  // A função handleCancelEdit é útil para limpar o formulário e voltar ao modo de adição.
+  const handleUpdateService = async (event) => {
+    event.preventDefault();
+    if (!editingServiceId) return; // Não deveria acontecer, mas por segurança
+
+    setCreateServiceError(''); // Reutilizando o estado de erro
+    setIsCreatingService(true); // Reutilizando o estado de loading
+
+    const updatedServiceData = {
+      name: newServiceName,
+      description: newServiceDescription || null,
+      price: parseFloat(newServicePrice),
+      duration_minutes: parseInt(newServiceDuration, 10),
+      // is_active: você pode querer adicionar um campo para isso no formulário também
+    };
+
+    // Validação básica
+    if (!updatedServiceData.name || !updatedServiceData.price || !updatedServiceData.duration_minutes) {
+      setCreateServiceError('Nome, preço e duração são obrigatórios.');
+      setIsCreatingService(false);
+      return;
+    }
+    if (isNaN(updatedServiceData.price) || isNaN(updatedServiceData.duration_minutes)) {
+      setCreateServiceError('Preço e duração devem ser números.');
+      setIsCreatingService(false);
+      return;
+    }
+
+    try {
+      const updatedService = await updateService(editingServiceId, updatedServiceData);
+      // Atualiza a lista de serviços no estado
+      setServices(prevServices =>
+        prevServices.map(s => (s.id === editingServiceId ? updatedService : s))
+      );
+
+      alert('Serviço atualizado com sucesso!');
+      handleCancelEdit(); // Limpa o formulário e sai do modo de edição
+
+    } catch (error) {
+      console.error("Erro ao atualizar serviço:", error);
+      setCreateServiceError(error.detail || error.message || 'Falha ao atualizar serviço.');
+    } finally {
+      setIsCreatingService(false);
+    }
+  };
+
+  // Função para cancelar a edição e limpar o formulário
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingServiceId(null);
+    setNewServiceName('');
+    setNewServiceDescription('');
+    setNewServicePrice('');
+    setNewServiceDuration('');
+    setCreateServiceError('');
+  };
 
   const handleLogout = () => {
     logout();
@@ -132,63 +211,80 @@ const DashboardPage = () => {
                     <p className="text-sm">Duração: {service.duration_minutes} minutos</p>
                     <p className="text-sm">Preço: R$ {service.price.toFixed(2)}</p>
                     <p className="text-sm">Status: {service.is_active ? 'Ativo' : 'Inativo'}</p>
+                    <Button
+                      onClick={() => handleStartEdit(service)}
+                      className="bg-yellow-500 hover:bg-yellow-700 text-white text-sm py-1 px-2 rounded mt-2"
+                    >
+                      Editar
+                    </Button>
                   </li>
+
+
                 ))}
               </ul>
             )}
           </div>
 
           {/* Seção para Adicionar Novo Serviço */}
-          <div className="mt-10 pt-6 border-t">
-            <h2 className="text-2xl font-semibold mb-3">Adicionar Novo Serviço</h2>
-            {createServiceError && <p className="text-red-500 text-sm mb-4">{createServiceError}</p>}
-            <form onSubmit={handleCreateService} className="space-y-4">
-              <InputField
-                label="Nome do Serviço"
-                type="text"
-                name="newServiceName"
-                placeholder="Ex: Banho e Tosa Completo"
-                value={newServiceName}
-                onChange={(e) => setNewServiceName(e.target.value)}
-                disabled={isCreatingService}
-                required // Marca o campo como obrigatório no HTML5
-              />
-              <InputField
-                label="Descrição (Opcional)"
-                type="text" // Ou <textarea /> se preferir um campo maior
-                name="newServiceDescription"
-                placeholder="Detalhes do serviço"
-                value={newServiceDescription}
-                onChange={(e) => setNewServiceDescription(e.target.value)}
-                disabled={isCreatingService}
-              />
-              <div className="grid grid-cols-2 gap-4">
+          <div id="service-form-section" className="mt-10 pt-6 border-t">
+            <div className="mt-10 pt-6 border-t">
+              <h2 className="text-2xl font-semibold mb-3">
+                {isEditing ? 'Editar Serviço' : 'Adicionar Novo Serviço'}
+              </h2>
+              {createServiceError && <p className="text-red-500 text-sm mb-4">{createServiceError}</p>}
+              <form onSubmit={isEditing ? handleUpdateService : handleCreateService} className="space-y-4">
                 <InputField
-                  label="Preço (R$)"
-                  type="number"
-                  name="newServicePrice"
-                  placeholder="Ex: 75.50"
-                  value={newServicePrice}
-                  onChange={(e) => setNewServicePrice(e.target.value)}
+                  label="Nome do Serviço"
+                  type="text"
+                  name="newServiceName"
+                  placeholder="Ex: Banho e Tosa Completo"
+                  value={newServiceName}
+                  onChange={(e) => setNewServiceName(e.target.value)}
                   disabled={isCreatingService}
-                  step="0.01" // Para permitir decimais
-                  required
+                  required // Marca o campo como obrigatório no HTML5
                 />
                 <InputField
-                  label="Duração (minutos)"
-                  type="number"
-                  name="newServiceDuration"
-                  placeholder="Ex: 60"
-                  value={newServiceDuration}
-                  onChange={(e) => setNewServiceDuration(e.target.value)}
+                  label="Descrição (Opcional)"
+                  type="text" // Ou <textarea /> se preferir um campo maior
+                  name="newServiceDescription"
+                  placeholder="Detalhes do serviço"
+                  value={newServiceDescription}
+                  onChange={(e) => setNewServiceDescription(e.target.value)}
                   disabled={isCreatingService}
-                  required
                 />
-              </div>
-              <Button type="submit" className="bg-green-500 hover:bg-green-700" disabled={isCreatingService}>
-                {isCreatingService ? 'Adicionando...' : 'Adicionar Serviço'}
-              </Button>
-            </form>
+                <div className="grid grid-cols-2 gap-4">
+                  <InputField
+                    label="Preço (R$)"
+                    type="number"
+                    name="newServicePrice"
+                    placeholder="Ex: 75.50"
+                    value={newServicePrice}
+                    onChange={(e) => setNewServicePrice(e.target.value)}
+                    disabled={isCreatingService}
+                    step="0.01" // Para permitir decimais
+                    required
+                  />
+                  <InputField
+                    label="Duração (minutos)"
+                    type="number"
+                    name="newServiceDuration"
+                    placeholder="Ex: 60"
+                    value={newServiceDuration}
+                    onChange={(e) => setNewServiceDuration(e.target.value)}
+                    disabled={isCreatingService}
+                    required
+                  />
+                </div>
+                <Button type="submit" className={isEditing ? "bg-orange-500 hover:bg-orange-700" : "bg-green-500 hover:bg-green-700"} disabled={isCreatingService}>
+                  {isCreatingService ? (isEditing ? 'Salvando...' : 'Adicionando...') : (isEditing ? 'Salvar Alterações' : 'Adicionar Serviço')}
+                </Button>
+                {isEditing && (
+                  <Button type="button" onClick={handleCancelEdit} className="bg-gray-500 hover:bg-gray-700 ml-2" disabled={isCreatingService}>
+                    Cancelar Edição
+                  </Button>
+                )}
+              </form>
+            </div>
           </div>
 
         </div>
@@ -217,5 +313,17 @@ Resumo das Mudanças: Seção para Adicionar Novo Serviço
 - Adicionamos estados no DashboardPage para controlar os campos do formulário de novo serviço e o estado de carregamento/erro da criação.
 - Criamos a função handleCreateService que monta o payload, faz validações básicas, chama o serviço da API e atualiza a UI.
 - Adicionamos o JSX do formulário, usando seus componentes InputField e Button, e conectando-os aos novos estados e à função handleCreateService.
+
+Edição de Serviços
+- Importante: Se o seu formulário de adicionar serviço estiver em um componente modal separado, a lógica de handleStartEdit seria para abrir o modal e passar os dados do serviceToEdit para ele. Como estamos reutilizando o formulário que já está na página, apenas preenchemos os estados e mudamos o modo.
+- Dei um ID service-form-section à div do formulário (veja no Passo 5) para um scroll opcional.
+
+Resumo das Mudanças: Edição de Serviços
+- Novos estados isEditing e editingServiceId.
+- Botão "Editar" em cada serviço listado.
+- Função handleStartEdit para popular o formulário e entrar no modo de edição.
+- Função handleUpdateService para enviar as atualizações para a API.
+- Função handleCancelEdit para limpar o formulário e sair do modo de edição.
+- Formulário e botão de submit adaptados para funcionar tanto para criar quanto para editar.
 
 */
