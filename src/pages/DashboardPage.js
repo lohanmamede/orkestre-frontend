@@ -4,7 +4,32 @@ import InputField from '../components/common/InputField'
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
-import { getServicesByEstablishment, createServiceForEstablishment, updateService, deleteService } from '../services/serviceService'; // Importe o serviço
+import { getServicesByEstablishment, createServiceForEstablishment, updateService, deleteService } from '../services/serviceService';
+import WorkingHoursForm from '../components/dashboard/WorkingHoursFrom'; // Importe o novo componente
+import { getEstablishmentDetails, updateEstablishmentWorkingHours } from '../services/establishmentService'; // Importe as novas funções
+
+// Definindo os dias da semana e o estado inicial para os dias
+// Estes dados serão usados tanto no formulário de horários de funcionamento quanto na lógica de criação/edição de serviços
+const daysOfWeek = [
+  { key: 'monday', label: 'Segunda-feira' },
+  { key: 'tuesday', label: 'Terça-feira' },
+  { key: 'wednesday', label: 'Quarta-feira' },
+  { key: 'thursday', label: 'Quinta-feira' },
+  { key: 'friday', label: 'Sexta-feira' },
+  { key: 'saturday', label: 'Sábado' },
+  { key: 'sunday', label: 'Domingo' },
+];
+
+// Estado inicial para um dia de funcionamento
+// Este estado será usado para inicializar os dias no formulário de horários de funcionamento
+const initialDayState = {
+  is_active: false,
+  start_time: '',
+  end_time: '',
+  lunch_break_start_time: '',
+  lunch_break_end_time: '',
+};
+
 
 const DashboardPage = () => {
   const { token, logout, isAuthenticated } = useAuth();
@@ -27,29 +52,58 @@ const DashboardPage = () => {
   const [deletingServiceId, setDeletingServiceId] = useState(null);
   const [isDeletingService, setIsDeletingService] = useState(false);
   const [deleteServiceError, setDeleteServiceError] = useState('');
-
-
+  // Novos estados para controle de horários de funcionamento
+  // Estes estados serão usados para buscar e salvar a configuração de horários de funcionamento do estabelecimento
+  const [workingHoursConfig, setWorkingHoursConfig] = useState(null); // Para guardar a config de horários
+  const [isLoadingWorkingHours, setIsLoadingWorkingHours] = useState(false); // Para o loading da busca de horários
+  const [workingHoursError, setWorkingHoursError] = useState(''); // Para erros na busca/salvamento de horários
+  const [isSavingHours, setIsSavingHours] = useState(false); // Para o loading do salvamento de horários
   // Defina o ID do estabelecimento para teste por enquanto
   // No futuro, este ID virá do usuário logado/AuthContext
   const ESTABLISHMENT_ID_FOR_TESTING = 1; // <<-- COLOQUE AQUI O ID DO SEU ESTABELECIMENTO DE TESTE
 
   useEffect(() => {
-    if (isAuthenticated && ESTABLISHMENT_ID_FOR_TESTING) {
-      const fetchServices = async () => {
+    const fetchData = async () => {
+      if (isAuthenticated && ESTABLISHMENT_ID_FOR_TESTING) {
+        // Buscar Serviços (como já estava)
         setIsLoadingServices(true);
         setServicesError('');
         try {
-          const data = await getServicesByEstablishment(ESTABLISHMENT_ID_FOR_TESTING);
-          setServices(data);
+          const servicesData = await getServicesByEstablishment(ESTABLISHMENT_ID_FOR_TESTING);
+          setServices(servicesData);
         } catch (error) {
           console.error("Erro ao buscar serviços:", error);
           setServicesError(error.detail || error.message || 'Falha ao carregar serviços.');
         } finally {
           setIsLoadingServices(false);
         }
-      };
-      fetchServices();
-    }
+
+        // Buscar Configuração de Horários do Estabelecimento
+        setIsLoadingWorkingHours(true);
+        setWorkingHoursError('');
+        try {
+          const establishmentData = await getEstablishmentDetails(ESTABLISHMENT_ID_FOR_TESTING);
+          if (establishmentData && establishmentData.working_hours_config) {
+            setWorkingHoursConfig(establishmentData.working_hours_config);
+          } else {
+            // Se não houver configuração, podemos setar um objeto vazio ou com defaults
+            // para o WorkingHoursForm inicializar corretamente
+            const defaultConfig = {};
+            daysOfWeek.forEach(day => { // 'daysOfWeek' precisaria ser importado ou definido aqui também
+              defaultConfig[day.key] = { ...initialDayState }; // 'initialDayState' também
+            });
+            defaultConfig.appointment_interval_minutes = 30;
+            setWorkingHoursConfig(defaultConfig);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar configuração de horários:", error);
+          setWorkingHoursError(error.detail || error.message || 'Falha ao carregar configuração de horários.');
+        } finally {
+          setIsLoadingWorkingHours(false);
+        }
+      }
+    };
+    fetchData();
   }, [isAuthenticated]); // Dependência: re-busca se o estado de autenticação mudar
 
   const handleCreateService = async (event) => {
@@ -213,6 +267,32 @@ const DashboardPage = () => {
     }
   };
 
+  // Função para salvar a configuração de horários de funcionamento
+  // Esta função será chamada pelo WorkingHoursForm quando o usuário clicar em "Salvar"
+  const handleSaveWorkingHours = async (configDataToSave) => {
+    if (!ESTABLISHMENT_ID_FOR_TESTING) {
+      setWorkingHoursError("ID do estabelecimento não encontrado para salvar horários.");
+      return;
+    }
+    setIsSavingHours(true);
+    setWorkingHoursError('');
+    try {
+      const updatedEstablishment = await updateEstablishmentWorkingHours(
+        ESTABLISHMENT_ID_FOR_TESTING,
+        configDataToSave
+      );
+      // Atualiza o estado local com a configuração salva (que vem na resposta)
+      setWorkingHoursConfig(updatedEstablishment.working_hours_config);
+      alert('Horários de atendimento salvos com sucesso!');
+    } catch (error) {
+      console.error("Erro ao salvar horários:", error);
+      setWorkingHoursError(error.detail || error.message || 'Falha ao salvar horários.');
+      alert(`Erro ao salvar horários: ${error.detail || error.message || 'Falha ao salvar horários.'}`);
+    } finally {
+      setIsSavingHours(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -344,34 +424,54 @@ const DashboardPage = () => {
       {/* Modal de Confirmação de Exclusão */}
       {showDeleteConfirmModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-      <div className="p-8 border w-96 shadow-lg rounded-md bg-white">
-        <div className="text-center">
-          <h3 className="text-2xl font-bold text-gray-900">Confirmar Exclusão</h3>
-          <p className="text-sm text-gray-500 mt-2 mb-4">
-            Você tem certeza que deseja excluir este serviço? <br/>
-            Esta ação não pode ser desfeita.
-          </p>
-          {deleteServiceError && <p className="text-red-500 text-sm mb-4">{deleteServiceError}</p>}
-          <div className="flex justify-center space-x-4">
-            <Button 
-              onClick={handleCancelDelete}
-              className="bg-gray-300 hover:bg-gray-400 text-gray-800"
-              disabled={isDeletingService}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={isDeletingService}
-            >
-              {isDeletingService ? 'Excluindo...' : 'Confirmar Exclusão'}
-            </Button>
+          <div className="p-8 border w-96 shadow-lg rounded-md bg-white">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-gray-900">Confirmar Exclusão</h3>
+              <p className="text-sm text-gray-500 mt-2 mb-4">
+                Você tem certeza que deseja excluir este serviço? <br />
+                Esta ação não pode ser desfeita.
+              </p>
+              {deleteServiceError && <p className="text-red-500 text-sm mb-4">{deleteServiceError}</p>}
+              <div className="flex justify-center space-x-4">
+                <Button
+                  onClick={handleCancelDelete}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800"
+                  disabled={isDeletingService}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  disabled={isDeletingService}
+                >
+                  {isDeletingService ? 'Excluindo...' : 'Confirmar Exclusão'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       )}
+
+      {/* Seção de Configuração de Horários de Atendimento */}
+      <div className="mt-10 pt-6 border-t">
+        {isLoadingWorkingHours && <p>Carregando configuração de horários...</p>}
+        {/* Só renderiza o formulário se workingHoursConfig não for null (ou seja, após a busca inicial).
+            Isso garante que o formulário receba o initialConfig corretamente.
+          */}
+        {!isLoadingWorkingHours && workingHoursConfig && (
+          <WorkingHoursForm
+            initialConfig={workingHoursConfig}
+            onSave={handleSaveWorkingHours}
+            isLoading={isSavingHours}
+            error={workingHoursError} // Passando o erro específico do salvamento de horários
+          />
+        )}
+        {/* Se workingHoursError tiver um erro da busca inicial, você pode exibi-lo aqui também */}
+        {!isLoadingWorkingHours && servicesError && !workingHoursConfig && ( // Ajuste: erro da busca de config
+          <p className="text-red-500">Erro ao carregar configuração de horários: {workingHoursError}</p>
+        )}
+      </div>
 
     </div>
   );
