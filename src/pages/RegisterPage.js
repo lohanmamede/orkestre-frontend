@@ -8,6 +8,7 @@ const RegisterPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [establishmentName, setEstablishmentName] = useState('');
     const [isLoading, setIsLoading] = useState(false); // Estado para feedback de carregamento
     const [error, setError] = useState(''); // Estado para mensagens de erro da API
 
@@ -15,13 +16,15 @@ const RegisterPage = () => {
 
     const handleChange = (event) => {
         const { name, value } = event.target;
-        setError(''); // Limpa erros anteriores ao digitar
+        setError('');
         if (name === 'email') {
             setEmail(value);
         } else if (name === 'password') {
             setPassword(value);
         } else if (name === 'confirmPassword') {
             setConfirmPassword(value);
+        } else if (name === 'establishmentName') {
+            setEstablishmentName(value);
         }
     };
 
@@ -37,16 +40,22 @@ const RegisterPage = () => {
         setIsLoading(true); // Ativa o estado de carregamento
 
         try {
-            const userData = { email, password };
+            // Payload para o registro
+            const userData = {
+                email,
+                password,
+                establishment_name: establishmentName // <<<--- CHAVE E VALOR ADICIONADOS
+            };
             const responseData = await registerUser(userData); // Chama a API
 
-            console.log('Usuário registrado com sucesso:', responseData);
+            console.log('Usuário e Estabelecimento registrados com sucesso:', responseData);
             alert('Cadastro realizado com sucesso! Você será redirecionado para o login.');
 
             // Limpar campos (opcional)
             setEmail('');
             setPassword('');
             setConfirmPassword('');
+            setEstablishmentName('');
 
             navigate('/login'); // Redireciona para a página de login
 
@@ -91,6 +100,26 @@ const RegisterPage = () => {
                         value={email}
                         onChange={handleChange}
                         disabled={isLoading} // Desabilita input durante o carregamento
+                    />
+                    <InputField
+                        label="Nome do Estabelecimento"
+                        type="text"
+                        name="establishmentName" // Importante para o handleChange
+                        placeholder="Ex: Pet Shop Patas Felizes"
+                        value={establishmentName} // Conecta ao estado
+                        onChange={handleChange} // Atualiza o estado
+                        disabled={isLoading}
+                        required
+                    />
+                    <InputField
+                        label="Email do Proprietário" // Pode ser bom diferenciar
+                        type="email"
+                        name="email"
+                        placeholder="seuemail@example.com"
+                        value={email}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                        required
                     />
                     <InputField
                         label="Senha"
