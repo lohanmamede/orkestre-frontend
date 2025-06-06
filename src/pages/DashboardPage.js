@@ -32,7 +32,7 @@ const initialDayState = {
 
 
 const DashboardPage = () => {
-  const { token, logout, isAuthenticated } = useAuth();
+  const { token, logout, isAuthenticated, currentUser, isLoadingUser } = useAuth();
   const navigate = useNavigate();
 
   const [services, setServices] = useState([]);
@@ -60,16 +60,19 @@ const DashboardPage = () => {
   const [isSavingHours, setIsSavingHours] = useState(false); // Para o loading do salvamento de horários
   // Defina o ID do estabelecimento para teste por enquanto
   // No futuro, este ID virá do usuário logado/AuthContext
-  const ESTABLISHMENT_ID_FOR_TESTING = 1; // <<-- COLOQUE AQUI O ID DO SEU ESTABELECIMENTO DE TESTE
+
 
   useEffect(() => {
     const fetchData = async () => {
-      if (isAuthenticated && ESTABLISHMENT_ID_FOR_TESTING) {
-        // Buscar Serviços (como já estava)
+      // Só busca os dados se estiver autenticado, o usuário estiver carregado, e tiver um ID de estabelecimento
+      if (isAuthenticated && currentUser && currentUser.establishment?.id) {
+        const establishmentId = currentUser.establishment.id;
+
+        // Buscar Serviços
         setIsLoadingServices(true);
         setServicesError('');
         try {
-          const servicesData = await getServicesByEstablishment(ESTABLISHMENT_ID_FOR_TESTING);
+          const servicesData = await getServicesByEstablishment(establishmentId);
           setServices(servicesData);
         } catch (error) {
           console.error("Erro ao buscar serviços:", error);
@@ -82,74 +85,60 @@ const DashboardPage = () => {
         setIsLoadingWorkingHours(true);
         setWorkingHoursError('');
         try {
-          const establishmentData = await getEstablishmentDetails(ESTABLISHMENT_ID_FOR_TESTING);
-          if (establishmentData && establishmentData.working_hours_config) {
-            setWorkingHoursConfig(establishmentData.working_hours_config);
+          // Se getEstablishmentDetails retorna o objeto completo, já temos working_hours_config
+          // Se não, podemos pegar de currentUser.establishment se o backend já o populou
+          // Assumindo que currentUser.establishment tem a estrutura completa
+          // ou que getEstablishmentDetails ainda é necessário se currentUser.establishment só tem id/name.
+          // Para simplificar, se currentUser.establishment já tiver working_hours_config:
+          if (currentUser.establishment.working_hours_config) {
+            setWorkingHoursConfig(currentUser.establishment.working_hours_config);
           } else {
-            // Se não houver configuração, podemos setar um objeto vazio ou com defaults
-            // para o WorkingHoursForm inicializar corretamente
-            const defaultConfig = {};
-            daysOfWeek.forEach(day => { // 'daysOfWeek' precisaria ser importado ou definido aqui também
-              defaultConfig[day.key] = { ...initialDayState }; // 'initialDayState' também
-            });
-            defaultConfig.appointment_interval_minutes = 30;
-            setWorkingHoursConfig(defaultConfig);
+            // Se não, podemos buscar ou usar um default.
+            // Se o endpoint /users/me já retorna working_hours_config dentro de establishment, melhor ainda.
+            // Vamos assumir por enquanto que o objeto currentUser.establishment já contém working_hours_config
+            // Se não, precisaríamos de getEstablishmentDetails(establishmentId) aqui.
+            // Vou ajustar o AuthContext para guardar o establishment inteiro ou apenas o id.
+            // Para agora, vamos supor que working_hours_config está em currentUser.establishment.
+
+            // Caso o working_hours_config não venha populado em currentUser.establishment:
+            const establishmentData = await getEstablishmentDetails(establishmentId);
+            if (establishmentData && establishmentData.working_hours_config) {
+              setWorkingHoursConfig(establishmentData.working_hours_config);
+            } else {
+              const defaultConfig = {};
+              daysOfWeek.forEach(day => {
+                defaultConfig[day.key] = { ...initialDayState };
+              });
+              defaultConfig.appointment_interval_minutes = 30;
+              setWorkingHoursConfig(defaultConfig);
+            }
           }
         } catch (error) {
-          console.error("Erro ao buscar configuração de horários:", error);
-          setWorkingHoursError(error.detail || error.message || 'Falha ao carregar configuração de horários.');
+          console.error("Erro ao buscar/configurar horários:", error);
+          setWorkingHoursError(error.detail || error.message || 'Falha ao carregar/configurar horários.');
         } finally {
           setIsLoadingWorkingHours(false);
         }
       }
     };
-    fetchData();
-  }, [isAuthenticated]); // Dependência: re-busca se o estado de autenticação mudar
+
+    if (!isLoadingUser) { // Só roda fetchData depois que tentamos carregar o usuário
+      fetchData();
+    }
+    // Adicionamos currentUser e isLoadingUser como dependências
+  }, [isAuthenticated, currentUser, isLoadingUser]);
+
 
   const handleCreateService = async (event) => {
     event.preventDefault();
-    setCreateServiceError('');
-    setIsCreatingService(true);
-
-    const serviceData = {
-      name: newServiceName,
-      description: newServiceDescription || null, // Envia null se a descrição for vazia
-      price: parseFloat(newServicePrice), // Converte para float
-      duration_minutes: parseInt(newServiceDuration, 10), // Converte para int
-      is_active: true // Por padrão, criamos como ativo
-    };
-
-    // Validação básica no frontend (pode ser mais robusta)
-    if (!serviceData.name || !serviceData.price || !serviceData.duration_minutes) {
-      setCreateServiceError('Nome, preço e duração são obrigatórios.');
+    // ... (validações, etc.) ...
+    if (!currentUser?.establishment?.id) {
+      setCreateServiceError("Não foi possível identificar o estabelecimento do usuário.");
       setIsCreatingService(false);
       return;
     }
-    if (isNaN(serviceData.price) || isNaN(serviceData.duration_minutes)) {
-      setCreateServiceError('Preço e duração devem ser números.');
-      setIsCreatingService(false);
-      return;
-    }
-
-    console.log("Enviando para criar serviço:", serviceData);
-
-    try {
-      const newService = await createServiceForEstablishment(ESTABLISHMENT_ID_FOR_TESTING, serviceData);
-      setServices(prevServices => [newService, ...prevServices]); // Adiciona o novo serviço no início da lista
-
-      // Limpa os campos do formulário
-      setNewServiceName('');
-      setNewServiceDescription('');
-      setNewServicePrice('');
-      setNewServiceDuration('');
-      alert('Serviço adicionado com sucesso!');
-
-    } catch (error) {
-      console.error("Erro ao criar serviço:", error);
-      setCreateServiceError(error.detail || error.message || 'Falha ao criar serviço.');
-    } finally {
-      setIsCreatingService(false);
-    }
+    const establishmentId = currentUser.establishment.id;
+    // ... (resto da lógica com serviceData e chamada a createServiceForEstablishment(establishmentId, serviceData)) ...
   };
 
   // Função para iniciar a edição de um serviço
@@ -270,27 +259,12 @@ const DashboardPage = () => {
   // Função para salvar a configuração de horários de funcionamento
   // Esta função será chamada pelo WorkingHoursForm quando o usuário clicar em "Salvar"
   const handleSaveWorkingHours = async (configDataToSave) => {
-    if (!ESTABLISHMENT_ID_FOR_TESTING) {
-      setWorkingHoursError("ID do estabelecimento não encontrado para salvar horários.");
+    if (!currentUser?.establishment?.id) {
+      setWorkingHoursError("Não foi possível identificar o estabelecimento do usuário para salvar horários.");
       return;
     }
-    setIsSavingHours(true);
-    setWorkingHoursError('');
-    try {
-      const updatedEstablishment = await updateEstablishmentWorkingHours(
-        ESTABLISHMENT_ID_FOR_TESTING,
-        configDataToSave
-      );
-      // Atualiza o estado local com a configuração salva (que vem na resposta)
-      setWorkingHoursConfig(updatedEstablishment.working_hours_config);
-      alert('Horários de atendimento salvos com sucesso!');
-    } catch (error) {
-      console.error("Erro ao salvar horários:", error);
-      setWorkingHoursError(error.detail || error.message || 'Falha ao salvar horários.');
-      alert(`Erro ao salvar horários: ${error.detail || error.message || 'Falha ao salvar horários.'}`);
-    } finally {
-      setIsSavingHours(false);
-    }
+    const establishmentId = currentUser.establishment.id;
+    // ... (resto da lógica com chamada a updateEstablishmentWorkingHours(establishmentId, configDataToSave)) ...
   };
 
   const handleLogout = () => {

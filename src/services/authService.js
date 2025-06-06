@@ -30,4 +30,30 @@ const loginUser = async (credentials) => {
   }
 };
 
-export { registerUser, loginUser };
+/*export (pode ser usado aqui também) antes do const*/ 
+const getCurrentUserDetails = async () => {
+  try {
+    // O token JWT já será incluído automaticamente pelo interceptor no apiClient
+    const response = await apiClient.get('/users/me'); 
+    return response.data; // Espera-se um objeto UserMe com id, email, establishment, etc.
+  } catch (error) {
+    console.error("Erro ao buscar detalhes do usuário:", error);
+    // O interceptor de resposta no apiClient (se você o implementou)
+    // já pode ter processado o error.response.data.
+    // Se não, você pode querer extrair error.response.data aqui.
+    // Por enquanto, relançamos o erro para ser tratado onde a função for chamada.
+    throw error; 
+  }
+};
+
+export { registerUser, loginUser, getCurrentUserDetails };
+
+/*
+Explicação da getCurrentUserDetails:
+- Ela faz uma requisição GET para o endpoint /users/me usando nosso apiClient.
+- Importante: O apiClient.js, com o interceptor de requisição que configuramos, automaticamente adicionará o token JWT (que deve estar no localStorage após o login) ao cabeçalho Authorization desta requisição. É por isso que não precisamos passar o token manualmente aqui.
+- Se a requisição for bem-sucedida, ela retorna os dados do usuário (o objeto UserMe que o backend envia).
+- Se houver um erro (ex: token inválido, expirado, ou o usuário não encontrado no backend), ela loga o erro e o relança para ser tratado pelo componente que a chamou (que será o nosso AuthContext).
+*/
+
+
