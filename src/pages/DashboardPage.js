@@ -129,16 +129,40 @@ const DashboardPage = () => {
   }, [isAuthenticated, currentUser, isLoadingUser]);
 
 
+  // Em DashboardPage.js
   const handleCreateService = async (event) => {
     event.preventDefault();
-    // ... (validações, etc.) ...
-    if (!currentUser?.establishment?.id) {
-      setCreateServiceError("Não foi possível identificar o estabelecimento do usuário.");
-      setIsCreatingService(false);
+    setCreateServiceError('');
+    if (!newServiceName || !newServicePrice || !newServiceDuration) {
+      setCreateServiceError('Nome, preço e duração são obrigatórios.');
       return;
     }
-    const establishmentId = currentUser.establishment.id;
-    // ... (resto da lógica com serviceData e chamada a createServiceForEstablishment(establishmentId, serviceData)) ...
+    if (!currentUser?.establishment?.id) {
+      setCreateServiceError("Não foi possível identificar o estabelecimento do usuário.");
+      return;
+    }
+
+    setIsCreatingService(true);
+    const serviceData = {
+      name: newServiceName,
+      description: newServiceDescription || null,
+      price: parseFloat(newServicePrice),
+      duration_minutes: parseInt(newServiceDuration, 10),
+      is_active: true
+    };
+
+    try {
+      const establishmentId = currentUser.establishment.id; // Agora establishmentId está sendo usado
+      const newService = await createServiceForEstablishment(establishmentId, serviceData);
+      setServices(prevServices => [newService, ...prevServices]);
+      handleCancelEdit(); // Usamos para limpar o formulário e resetar
+      alert('Serviço adicionado com sucesso!');
+    } catch (error) {
+      console.error("Erro ao criar serviço:", error);
+      setCreateServiceError(error.detail || error.message || 'Falha ao criar serviço.');
+    } finally {
+      setIsCreatingService(false);
+    }
   };
 
   // Função para iniciar a edição de um serviço
@@ -258,13 +282,31 @@ const DashboardPage = () => {
 
   // Função para salvar a configuração de horários de funcionamento
   // Esta função será chamada pelo WorkingHoursForm quando o usuário clicar em "Salvar"
+  // Em DashboardPage.js
   const handleSaveWorkingHours = async (configDataToSave) => {
     if (!currentUser?.establishment?.id) {
       setWorkingHoursError("Não foi possível identificar o estabelecimento do usuário para salvar horários.");
       return;
     }
-    const establishmentId = currentUser.establishment.id;
-    // ... (resto da lógica com chamada a updateEstablishmentWorkingHours(establishmentId, configDataToSave)) ...
+
+    setIsSavingHours(true); // Agora setIsSavingHours está sendo usado
+    setWorkingHoursError('');
+
+    try {
+      const establishmentId = currentUser.establishment.id; // Agora establishmentId está sendo usado
+      const updatedEstablishment = await updateEstablishmentWorkingHours(
+        establishmentId,
+        configDataToSave
+      );
+      setWorkingHoursConfig(updatedEstablishment.working_hours_config);
+      alert('Horários de atendimento salvos com sucesso!');
+    } catch (error) {
+      console.error("Erro ao salvar horários:", error);
+      setWorkingHoursError(error.detail || error.message || 'Falha ao salvar horários.');
+      alert(`Erro ao salvar horários: ${error.detail || error.message || 'Falha ao salvar horários.'}`);
+    } finally {
+      setIsSavingHours(false); // E aqui também
+    }
   };
 
   const handleLogout = () => {

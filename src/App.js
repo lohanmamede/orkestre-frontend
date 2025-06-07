@@ -22,9 +22,9 @@ function HomePage() {
 }
 
 // Componentes de página placeholder (substitua pelos seus reais depois)
-function LoginPagePlaceholder() { return <h2>Página de Login</h2>; }
+/* function LoginPagePlaceholder() { return <h2>Página de Login</h2>; }
 function RegisterPagePlaceholder() { return <h2>Página de Cadastro</h2>; }
-function DashboardPagePlaceholder() { return <h2>Dashboard</h2>; }
+function DashboardPagePlaceholder() { return <h2>Dashboard</h2>; } */
 
 
 function App() {
