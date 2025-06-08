@@ -7,6 +7,7 @@ import Button from '../components/common/Button';
 import { getServicesByEstablishment, createServiceForEstablishment, updateService, deleteService } from '../services/serviceService';
 import WorkingHoursForm from '../components/dashboard/WorkingHoursFrom'; // Importe o novo componente
 import { getEstablishmentDetails, updateEstablishmentWorkingHours } from '../services/establishmentService'; // Importe as novas funções
+import AgendaView from '../components/dashboard/AgendaView';
 
 // Definindo os dias da semana e o estado inicial para os dias
 // Estes dados serão usados tanto no formulário de horários de funcionamento quanto na lógica de criação/edição de serviços
@@ -489,6 +490,12 @@ const DashboardPage = () => {
         )}
       </div>
 
+
+      {/* Seção de Agenda */}
+      <div className="mt-10 pt-6 border-t">
+        <h2 className="text-2xl font-semibold mb-3">Agenda de Compromissos</h2>
+        <AgendaView />
+      </div>
     </div>
   );
 };

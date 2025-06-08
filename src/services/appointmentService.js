@@ -49,6 +49,34 @@ export const createAppointment = async (establishmentId, appointmentData) => {
   }
 };
 
+// NOVA FUNÇÃO para o profissional buscar sua agenda
+export const getAppointmentsByEstablishment = async (establishmentId, filters = {}) => {
+  try {
+    // O token JWT será enviado automaticamente pelo interceptor
+    const response = await apiClient.get(`/establishments/${establishmentId}/appointments/`, {
+      params: filters // Para filtros como ?start_date=...&status=...
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos:", error);
+    throw error;
+  }
+};
+
+// NOVA FUNÇÃO para o profissional atualizar o status
+export const updateAppointmentStatus = async (appointmentId, newStatus) => {
+  try {
+    // O token JWT será enviado automaticamente pelo interceptor
+    const response = await apiClient.patch(`/appointments/${appointmentId}/status`, {
+      status: newStatus // Envia o novo status no corpo da requisição
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Erro ao atualizar status do agendamento ${appointmentId}:`, error);
+    throw error;
+  }
+};
+
 // Futuramente, podemos adicionar mais funções aqui:
 // - getAppointmentDetails(appointmentId)
 // - cancelAppointment(appointmentId, cancelToken)
