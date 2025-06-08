@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ProtectedRoute from './components/ProtectedRoute'; // Ajuste o caminho se necessário
+import BookingPage from './pages/BookingPage';
 
 
 function HomePage() {
@@ -35,6 +36,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cadastro" element={<RegisterPage />} />
+          <Route path="/agendar/:establishmentId" element={<BookingPage />} /> {/* <<<--- NOVA ROTA PÚBLICA */}
 
           {/* Rota Protegida para o Dashboard */}
           <Route element={<ProtectedRoute />}> {/* Envolve as rotas que você quer proteger */}
