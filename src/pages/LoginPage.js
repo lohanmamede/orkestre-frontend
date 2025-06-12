@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { loginUser } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 import InputField from '../components/common/InputField';
 import Button from '../components/common/Button';
-import { Link, useNavigate } from 'react-router-dom'; // Importe useNavigate e Link
-import { loginUser } from '../services/authService'; // Importe nossa função de serviço de login
-import { useAuth } from '../contexts/AuthContext'; // Importe o hook useAuth
+import Card from '../components/common/Card';
+import Container from '../components/common/Container';
+import Alert from '../components/common/Alert';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -77,41 +80,85 @@ const LoginPage = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    };    return (
+        <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center py-12">
+            <Container size="sm">
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
+                        <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <h1 className="text-3xl font-display font-bold text-secondary-900 mb-2">Bem-vindo de volta</h1>
+                    <p className="text-secondary-600">Entre na sua conta do Orkestre Agenda</p>
+                </div>
 
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-            <div className="p-8 bg-white shadow-md rounded-lg w-full max-w-md">
-                <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login - Orkestre Agenda</h2>
-                {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>} {/* Mostra mensagem de erro */}
-                <form onSubmit={handleSubmit}>
-                    <InputField
-                        label="Email"
-                        type="email"
-                        name="email"
-                        placeholder="seuemail@example.com"
-                        value={email}
-                        onChange={handleChange}
-                        disabled={isLoading} // Desabilita input durante o carregamento
-                    />
-                    <InputField
-                        label="Senha"
-                        type="password"
-                        name="password"
-                        placeholder="********"
-                        value={password}
-                        onChange={handleChange}
-                        disabled={isLoading}
-                    />
-                    <Button type="submit" className="w-full mt-6" disabled={isLoading}>
-                        {isLoading ? 'Entrando...' : 'Entrar'} {/* Feedback no botão */}
-                    </Button>
-                </form>
-                <p className="text-center text-sm text-gray-600 mt-4">
-                    Não tem uma conta? <Link to="/cadastro" className="text-blue-500 hover:text-blue-700">Cadastre-se</Link>
-                </p>
-                {/* Adicionar link "Esqueci minha senha" no futuro */}
-            </div>
+                <Card>
+                    {error && (
+                        <Alert type="error" className="mb-6">
+                            {error}
+                        </Alert>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <InputField
+                            label="Email"
+                            type="email"
+                            name="email"
+                            placeholder="seu@email.com"
+                            value={email}
+                            onChange={handleChange}
+                            disabled={isLoading}
+                            required
+                            icon={
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            }
+                        />
+                        
+                        <InputField
+                            label="Senha"
+                            type="password"
+                            name="password"
+                            placeholder="Sua senha"
+                            value={password}
+                            onChange={handleChange}
+                            disabled={isLoading}
+                            required
+                            icon={
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            }
+                        />
+
+                        <Button 
+                            type="submit" 
+                            variant="primary" 
+                            size="lg"
+                            loading={isLoading}
+                            disabled={isLoading}
+                            className="w-full"
+                        >
+                            {isLoading ? 'Entrando...' : 'Entrar'}
+                        </Button>
+                    </form>
+
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-secondary-600">
+                            Não tem uma conta?{' '}
+                            <Link to="/cadastro" className="text-primary-600 hover:text-primary-700 font-medium transition-colors">
+                                Cadastre-se aqui
+                            </Link>
+                        </p>
+                    </div>
+                </Card>
+
+                <div className="text-center mt-8 text-sm text-secondary-500">
+                    © 2024 Orkestre Agenda. Todos os direitos reservados.
+                </div>
+            </Container>
         </div>
     );
 };
