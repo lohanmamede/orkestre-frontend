@@ -1,0 +1,203 @@
+/* Estilos customizados para a Agenda */
+
+.agenda-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.agenda-day-cell {
+  background: white;
+  min-height: 80px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.agenda-day-cell:hover {
+  background: #f8fafc;
+}
+
+.agenda-day-cell.today {
+  background: #dbeafe;
+  border: 2px solid #3b82f6;
+}
+
+.agenda-day-cell.selected {
+  background: #eff6ff;
+  border: 2px solid #2563eb;
+}
+
+.agenda-day-cell.other-month {
+  background: #f9fafb;
+  color: #9ca3af;
+}
+
+.agenda-intensity-1 {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.agenda-intensity-2 {
+  background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+}
+
+.agenda-intensity-3 {
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+}
+
+.agenda-intensity-4 {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  color: white;
+}
+
+.agenda-intensity-5 {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.agenda-appointment-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin: 1px;
+  opacity: 0.8;
+}
+
+.agenda-appointment-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+}
+
+.agenda-metric-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.agenda-metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--metric-color, #3b82f6) 0%, transparent 100%);
+}
+
+.agenda-week-view-timeline {
+  background: linear-gradient(to bottom, 
+    #f8fafc 0%, 
+    #f1f5f9 50%, 
+    #e2e8f0 100%
+  );
+  border-radius: 8px;
+  position: relative;
+}
+
+.agenda-appointment-card {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.agenda-appointment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 30px -5px rgba(0, 0, 0, 0.04);
+}
+
+.agenda-status-pending {
+  border-left: 4px solid #f59e0b;
+}
+
+.agenda-status-confirmed {
+  border-left: 4px solid #3b82f6;
+}
+
+.agenda-status-completed {
+  border-left: 4px solid #10b981;
+}
+
+.agenda-status-cancelled {
+  border-left: 4px solid #ef4444;
+}
+
+.agenda-status-no-show {
+  border-left: 4px solid #6b7280;
+}
+
+/* Animações */
+@keyframes agenda-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.agenda-fade-in {
+  animation: agenda-fade-in 0.3s ease-out;
+}
+
+@keyframes agenda-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.agenda-pulse {
+  animation: agenda-pulse 2s infinite;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .agenda-day-cell {
+    min-height: 60px;
+  }
+  
+  .agenda-appointment-dots {
+    bottom: 2px;
+  }
+  
+  .agenda-appointment-dot {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* Indicadores visuais para densidade */
+.density-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* Efeitos de hover melhorados */
+.agenda-day-cell:hover .density-indicator {
+  opacity: 1;
+  transform: scale(1.2);
+  transition: all 0.2s ease;
+}
+
+/* Gradientes suaves para as métricas */
+.metric-today { --metric-color: #3b82f6; }
+.metric-confirmed { --metric-color: #10b981; }
+.metric-pending { --metric-color: #f59e0b; }
+.metric-week { --metric-color: #8b5cf6; }
+.metric-revenue { --metric-color: #06b6d4; }

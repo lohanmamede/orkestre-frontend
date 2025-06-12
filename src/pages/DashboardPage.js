@@ -682,9 +682,7 @@ const DashboardPage = () => {
                     </svg>
                     Novo Agendamento
                   </Button>
-                </div>
-
-                <Card>
+                </div>                <Card className="min-h-[70vh]">
                   <AgendaView />
                 </Card>
               </div>
