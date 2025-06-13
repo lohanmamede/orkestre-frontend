@@ -1,6 +1,6 @@
 // src/components/dashboard/AgendaView.js
 import React, { useState, useEffect, useMemo } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, parseISO, startOfDay, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, parseISO, startOfDay, addWeeks, subWeeks, addMonths, subMonths, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAppointmentsByEstablishment, updateAppointmentStatus } from '../../services/appointmentService';
@@ -15,16 +15,15 @@ const AgendaView = () => {
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [view, setView] = useState('month'); // 'week', 'month', 'year'
+  const [error, setError] = useState('');  const [view, setView] = useState('month'); // 'week', 'month', 'year'
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());  // Buscar agendamentos e serviços
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dayViewType, setDayViewType] = useState('cards'); // 'cards' ou 'timeline'
+  // Buscar agendamentos e serviços
   useEffect(() => {
     if (currentUser?.establishment?.id) {
       const establishmentId = currentUser.establishment.id;
-      setIsLoading(true);
-      
-      // Buscar agendamentos e serviços em paralelo
+      setIsLoading(true);      // Buscar agendamentos e serviços em paralelo
       Promise.all([
         getAppointmentsByEstablishment(establishmentId),
         getServicesByEstablishment(establishmentId)
@@ -36,77 +35,8 @@ const AgendaView = () => {
             return acc;
           }, {});
           
-          // Adicionar dados fictícios para demonstração
-          const mockAppointments = [
-            {
-              id: 1,
-              customer_name: "Maria Silva",
-              customer_phone: "(11) 99999-1234",
-              start_time: new Date().toISOString(),
-              status: "confirmed",
-              service_id: 1
-            },
-            {
-              id: 2,
-              customer_name: "João Santos",
-              customer_phone: "(11) 99999-5678",
-              start_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-              status: "pending",
-              service_id: 2
-            },
-            {
-              id: 3,
-              customer_name: "Ana Costa",
-              customer_phone: "(11) 99999-9876",
-              start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-              status: "confirmed",
-              service_id: 3
-            },
-            {
-              id: 4,
-              customer_name: "Pedro Oliveira",
-              customer_phone: "(11) 99999-4567",
-              start_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-              status: "completed",
-              service_id: 4
-            },
-            {
-              id: 5,
-              customer_name: "Carla Mendes",
-              customer_phone: "(11) 99999-3210",
-              start_time: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-              status: "pending",
-              service_id: 5
-            }
-          ];
-          
-          // Adicionar serviços mock se não existirem
-          const mockServices = [
-            { id: 1, name: "Corte de Cabelo", price: 50.0, duration_minutes: 30, description: "Corte de cabelo feminino", is_active: true },
-            { id: 2, name: "Barba", price: 30.0, duration_minutes: 20, description: "Aparar e modelar barba", is_active: true },
-            { id: 3, name: "Manicure", price: 40.0, duration_minutes: 45, description: "Manicure completa", is_active: true },
-            { id: 4, name: "Corte + Barba", price: 70.0, duration_minutes: 50, description: "Combo corte de cabelo e barba", is_active: true },
-            { id: 5, name: "Escova", price: 35.0, duration_minutes: 40, description: "Escova modeladora", is_active: true }
-          ];
-          
-          // Combinar serviços reais com mock (evitar duplicatas)
-          const allServices = [...servicesData];
-          mockServices.forEach(mockService => {
-            if (!allServices.find(s => s.id === mockService.id)) {
-              allServices.push(mockService);
-            }
-          });
-          
-          // Atualizar o mapa de serviços
-          allServices.forEach(service => {
-            servicesMap[service.id] = service;
-          });
-          
-          // Combinar dados reais com mock
-          const combinedAppointments = [...appointmentsData, ...mockAppointments];
-          
-          setServices(allServices);
-          setAppointments(combinedAppointments);
+          setServices(servicesData);
+          setAppointments(appointmentsData);
         })
         .catch(err => {
           setError('Falha ao carregar a agenda.');
@@ -129,7 +59,6 @@ const AgendaView = () => {
     }
     return null;
   };
-
   // Métricas calculadas
   const metrics = useMemo(() => {
     const today = startOfDay(new Date());
@@ -146,16 +75,17 @@ const AgendaView = () => {
 
     const pendingCount = appointments.filter(appt => appt.status === 'pending').length;
     const confirmedToday = todayAppointments.filter(appt => appt.status === 'confirmed').length;
-    
-    return {
+      return {
       today: todayAppointments.length,
       thisWeek: thisWeekAppointments.length,
       pending: pendingCount,
-      confirmedToday,      totalRevenue: thisWeekAppointments.reduce((sum, appt) => {
+      confirmedToday,
+      totalRevenue: thisWeekAppointments.reduce((sum, appt) => {
         const service = getServiceForAppointment(appt);
         return appt.status === 'completed' ? sum + (service?.price || 0) : sum;
-      }, 0)    };
-  }, [appointments, services]);
+      }, 0)
+    };
+  }, [appointments, getServiceForAppointment]);
 
   // Agrupamento de agendamentos por data
   const appointmentsByDate = useMemo(() => {
@@ -179,30 +109,17 @@ const AgendaView = () => {
     if (count >= 3 && count <= 4) return 'bg-primary-200 text-primary-800';
     if (count >= 5 && count <= 6) return 'bg-primary-400 text-white';
     return 'bg-primary-600 text-white font-bold';
-  };
-  const handleStatusChange = async (appointmentId, newStatus) => {
+  };  const handleStatusChange = async (appointmentId, newStatus) => {
     try {
-      // Para dados reais da API (IDs maiores que 100 indicam dados reais)
-      if (appointmentId > 100) {
-        const updatedAppointment = await updateAppointmentStatus(appointmentId, newStatus);
-        setAppointments(prev => 
-          prev.map(appt => (appt.id === appointmentId ? updatedAppointment : appt))
-        );
-      } else {
-        // Para dados mockados (IDs de 1-100 são mock)
-        setAppointments(prev => 
-          prev.map(appt => 
-            appt.id === appointmentId 
-              ? { ...appt, status: newStatus }
-              : appt
-          )
-        );
-      }
+      const updatedAppointment = await updateAppointmentStatus(appointmentId, newStatus);
+      setAppointments(prev => 
+        prev.map(appt => (appt.id === appointmentId ? updatedAppointment : appt))
+      );
     } catch (error) {
       alert('Falha ao atualizar o status.');
       console.error(error);
     }
-  };  // Navegação de datas
+  };// Navegação de datas
   const navigateDate = (direction) => {
     if (view === 'month') {
       setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
@@ -407,18 +324,41 @@ const AgendaView = () => {
               />}
             </div>
           </Card>
-        </div>
-
-        {/* Detalhes do Dia Selecionado */}
+        </div>        {/* Detalhes do Dia Selecionado */}
         <div className="h-full">
           <Card padding="md" className="h-full flex flex-col">
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h4 className="font-semibold text-secondary-900">
                 {format(selectedDate, 'dd \'de\' MMMM', { locale: ptBR })}
-              </h4>
-              <Badge variant={selectedDayAppointments.length > 0 ? 'primary' : 'secondary'}>
-                {selectedDayAppointments.length} agendamento(s)
-              </Badge>
+              </h4>              <div className="flex items-center space-x-3">
+                <div className="view-toggle-container flex items-center space-x-1 p-1">
+                  <Button 
+                    variant={dayViewType === 'cards' ? 'primary' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setDayViewType('cards')}
+                    className={`view-toggle-button text-xs px-3 py-1.5 h-8 ${dayViewType === 'cards' ? 'active' : ''}`}
+                  >
+                    <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Cards
+                  </Button>
+                  <Button 
+                    variant={dayViewType === 'timeline' ? 'primary' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setDayViewType('timeline')}
+                    className={`view-toggle-button text-xs px-3 py-1.5 h-8 ${dayViewType === 'timeline' ? 'active' : ''}`}
+                  >
+                    <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Timeline
+                  </Button>
+                </div>
+                <Badge variant={selectedDayAppointments.length > 0 ? 'primary' : 'secondary'} size="sm">
+                  {selectedDayAppointments.length}
+                </Badge>
+              </div>
             </div>
             
             <div className="flex-1 min-h-0">
@@ -432,17 +372,26 @@ const AgendaView = () => {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-secondary-300 scrollbar-track-secondary-100">                  {selectedDayAppointments
-                    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-                    .map(appt => (
-                    <AppointmentCard 
-                      key={appt.id} 
-                      appointment={appt} 
-                      getServiceForAppointment={getServiceForAppointment}
-                      onStatusChange={handleStatusChange} 
-                    />
-                  ))}
-                </div>
+                dayViewType === 'cards' ? (
+                  <div className="space-y-3 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-secondary-300 scrollbar-track-secondary-100">
+                    {selectedDayAppointments
+                      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                      .map(appt => (
+                      <AppointmentCard 
+                        key={appt.id} 
+                        appointment={appt} 
+                        getServiceForAppointment={getServiceForAppointment}
+                        onStatusChange={handleStatusChange} 
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <TimelineView 
+                    appointments={selectedDayAppointments}
+                    getServiceForAppointment={getServiceForAppointment}
+                    onStatusChange={handleStatusChange}
+                  />
+                )
               )}
             </div>
           </Card>
@@ -573,57 +522,15 @@ const WeekView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
   );
 };
 
-// Componente de Visualização Diária
-const DayView = ({ currentDate, appointments, handleStatusChange, getServiceForAppointment }) => {
-  const sortedAppointments = appointments.sort((a, b) => 
-    new Date(a.start_time) - new Date(b.start_time)
-  );
-
-  return (
-    <div className="space-y-4">
-      <div className="text-center p-4 bg-secondary-50 rounded-lg">
-        <h4 className="text-xl font-bold text-secondary-900">
-          {format(currentDate, 'dd \'de\' MMMM \'de\' yyyy', { locale: ptBR })}
-        </h4>
-        <p className="text-secondary-600">
-          {format(currentDate, 'EEEE', { locale: ptBR })}
-        </p>
-      </div>
-
-      {sortedAppointments.length === 0 ? (
-        <div className="text-center py-12 text-secondary-500">
-          <svg className="w-16 h-16 mx-auto mb-4 text-secondary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <p className="text-lg">Nenhum agendamento para este dia</p>
-          <p className="text-sm">Aproveite para descansar ou planejar!</p>
-        </div>
-      ) : (        <div className="space-y-3">
-          {sortedAppointments.map(appt => (
-            <AppointmentCard 
-              key={appt.id} 
-              appointment={appt} 
-              getServiceForAppointment={getServiceForAppointment}
-              onStatusChange={handleStatusChange}
-              detailed={true}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // Componente de Card de Agendamento
 const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment, detailed = false }) => {
-  const service = getServiceForAppointment ? getServiceForAppointment(appointment) : appointment.service;
-  const getStatusColor = (status) => {
+  const service = getServiceForAppointment ? getServiceForAppointment(appointment) : appointment.service;  const getStatusColor = (status) => {
     const colors = {
       pending: 'warning',
       confirmed: 'info',
       completed: 'success',
       cancelled_by_establishment: 'error',
-      cancelled_by_customer: 'error',
+      cancelled_by_client: 'error',
       no_show: 'error'
     };
     return colors[status] || 'secondary';
@@ -635,18 +542,17 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       confirmed: 'Confirmado',
       completed: 'Concluído',
       cancelled_by_establishment: 'Cancelado',
-      cancelled_by_customer: 'Cancelado pelo Cliente',
+      cancelled_by_client: 'Cancelado pelo Cliente',
       no_show: 'Não Compareceu'
     };
     return labels[status] || status;
-  };
-  const getStatusClass = (status) => {
+  };  const getStatusClass = (status) => {
     const classes = {
       pending: 'agenda-status-pending',
       confirmed: 'agenda-status-confirmed',
       completed: 'agenda-status-completed',
       cancelled_by_establishment: 'agenda-status-cancelled',
-      cancelled_by_customer: 'agenda-status-cancelled',
+      cancelled_by_client: 'agenda-status-cancelled',
       no_show: 'agenda-status-no-show'
     };
     return classes[status] || '';
@@ -685,9 +591,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
           </svg>
           Concluir
         </button>
-      );
-      
-      buttons.push(
+      );      buttons.push(
         <button
           key="no_show"
           onClick={() => onStatusChange(appointment.id, 'no_show')}
@@ -695,18 +599,17 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
           title="Cliente não compareceu"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
           </svg>
           Faltou
         </button>
       );
     }
-    
-    if (['pending', 'confirmed'].includes(appointment.status)) {
+      if (['pending', 'confirmed'].includes(appointment.status)) {
       buttons.push(
         <button
           key="cancel"
-          onClick={() => onStatusChange(appointment.id, 'cancelled')}
+          onClick={() => onStatusChange(appointment.id, 'cancelled_by_establishment')}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium"
           title="Cancelar agendamento"
         >
@@ -952,6 +855,198 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
             <span className="text-secondary-600">30+</span>
           </div>
         </div>
+      </div>
+    </div>  );
+};
+
+// Componente de Visualização em Timeline
+const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }) => {
+  // Determinar range de horários baseado nos agendamentos ou usar padrão (8h-20h)
+  const getTimeRange = () => {
+    if (appointments.length === 0) {
+      return Array.from({ length: 13 }, (_, i) => i + 8); // 8h-20h padrão
+    }
+    
+    const hours = appointments.map(appt => new Date(appt.start_time).getHours());
+    const minHour = Math.max(Math.min(...hours) - 1, 7); // Pelo menos 7h
+    const maxHour = Math.min(Math.max(...hours) + 2, 22); // No máximo 22h
+    
+    return Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
+  };
+
+  const timeSlots = getTimeRange();
+  
+  // Agrupar agendamentos por hora
+  const appointmentsByHour = useMemo(() => {
+    const grouped = {};
+    appointments.forEach(appt => {
+      const hour = new Date(appt.start_time).getHours();
+      if (!grouped[hour]) {
+        grouped[hour] = [];
+      }
+      grouped[hour].push(appt);
+    });
+    return grouped;
+  }, [appointments]);  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-gray-50 border-l-2 border-l-amber-200 border border-gray-200 shadow-sm text-slate-600',
+      confirmed: 'bg-gray-50 border-l-2 border-l-blue-200 border border-gray-200 shadow-sm text-slate-600',
+      completed: 'bg-gray-50 border-l-2 border-l-green-200 border border-gray-200 shadow-sm text-slate-600',
+      cancelled_by_establishment: 'bg-gray-50 border-l-2 border-l-red-200 border border-gray-200 shadow-sm text-slate-600',
+      cancelled_by_client: 'bg-gray-50 border-l-2 border-l-red-200 border border-gray-200 shadow-sm text-slate-600',
+      no_show: 'bg-gray-50 border-l-2 border-l-gray-300 border border-gray-200 shadow-sm text-slate-600'
+    };
+    return colors[status] || 'bg-gray-50 border-l-2 border-l-gray-300 border border-gray-200 shadow-sm text-slate-600';
+  };const getStatusIcon = (status) => {
+    const icons = {      pending: (
+        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      confirmed: (
+        <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      completed: (
+        <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),      cancelled_by_establishment: (
+        <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>      ),
+      cancelled_by_client: (
+        <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+        </svg>
+      ),
+      no_show: (
+        <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 14l-2-2m0 0l-2-2m2 2l-2 2m2-2l2 2" />
+        </svg>
+      )
+    };
+    return icons[status] || icons.pending;
+  };
+  return (
+    <div className="h-full overflow-y-auto timeline-view-container p-3">
+      <div className="space-y-0 border border-secondary-200 rounded-lg bg-white">
+        {timeSlots.map(hour => {
+          const hourAppointments = appointmentsByHour[hour] || [];
+          const timeLabel = `${hour.toString().padStart(2, '0')}:00`;
+          
+          return (            <div key={hour} className="flex timeline-hour-row">
+              {/* Coluna do horário */}
+              <div className="w-14 flex-shrink-0 timeline-hour-label text-xs font-medium py-2 px-2 text-center">
+                {timeLabel}
+              </div>
+                {/* Coluna dos agendamentos */}
+              <div className="flex-1 min-w-0 p-1.5">
+                {hourAppointments.length === 0 ? (
+                  <div className="h-7 flex items-center text-xs text-secondary-400 px-2">
+                    <span className="italic">Disponível</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {hourAppointments
+                      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                      .map(appointment => {
+                        const service = getServiceForAppointment(appointment);
+                        const startTime = format(parseISO(appointment.start_time), 'HH:mm');
+                        const duration = service?.duration_minutes || 30;
+                        const endTime = format(addMinutes(parseISO(appointment.start_time), duration), 'HH:mm');                        // Calcular largura baseada na duração (30min = largura base)
+                        const widthPercentage = Math.min((duration / 60) * 100, 100);
+                          return (                          <div
+                            key={appointment.id}
+                            className={`
+                              timeline-appointment-block timeline-appointment-${appointment.status}
+                              rounded-md px-2 py-1 cursor-pointer transition-all hover:shadow-md hover:border-l-6
+                              ${getStatusColor(appointment.status)}
+                            `}
+                            style={{ width: `${Math.max(widthPercentage, 30)}%`, minWidth: '180px' }}
+                            title={`${appointment.customer_name} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
+                          >
+                            {/* Conteúdo compacto */}                            <div className="flex items-center justify-between h-6 w-full">
+                              <div className="flex items-center space-x-1.5 flex-1 min-w-0 pr-3">
+                                <div className="flex-shrink-0">
+                                  {getStatusIcon(appointment.status)}
+                                </div>                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2">                                    <span className="text-xs opacity-75 font-medium">
+                                      {startTime}
+                                    </span>
+                                    <span className="font-medium text-xs truncate max-w-20">
+                                      {appointment.customer_name.split(' ')[0]}
+                                    </span>
+                                    {service && (
+                                      <span className="text-xs opacity-60 truncate max-w-16">
+                                        {service.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>                              {/* Botões de ação claramente separados no canto direito */}
+                              <div className="flex items-center space-x-0.5 flex-shrink-0">                                {appointment.status === 'pending' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onStatusChange(appointment.id, 'confirmed');
+                                    }}
+                                    className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
+                                    title="Confirmar"
+                                  >
+                                    ✓
+                                  </button>
+                                )}                                {appointment.status === 'confirmed' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onStatusChange(appointment.id, 'completed');
+                                    }}
+                                    className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
+                                    title="Concluir"
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+
+                                {appointment.status === 'confirmed' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onStatusChange(appointment.id, 'no_show');
+                                    }}
+                                    className="w-5 h-5 bg-white text-slate-400 rounded text-xs hover:bg-slate-50 flex items-center justify-center font-bold border border-slate-100 transition-colors"
+                                    title="Marcar Falta"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                    </svg>
+                                  </button>
+                                )}                                {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onStatusChange(appointment.id, 'cancelled_by_establishment');
+                                    }}
+                                    className="w-5 h-5 bg-white text-rose-400 rounded text-xs hover:bg-rose-50 flex items-center justify-center font-bold border border-rose-100 transition-colors"
+                                    title="Cancelar"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
