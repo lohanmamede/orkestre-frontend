@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getServicesByEstablishment, createServiceForEstablishment, updateService, deleteService } from '../services/serviceService';
@@ -12,7 +12,8 @@ import Container from '../components/common/Container';
 import Alert from '../components/common/Alert';
 import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
-import { LoadingState } from '../components/common/Loading';
+import { LoadingState, ServiceSkeleton } from '../components/common/LoadingStates';
+import { useToast } from '../components/common/Toast';
 
 // Definindo os dias da semana e o estado inicial para os dias
 const daysOfWeek = [
@@ -33,9 +34,14 @@ const initialDayState = {
   lunch_break_end_time: '',
 };
 
-const DashboardPage = () => {
-  const { token, logout, isAuthenticated, currentUser, isLoadingUser } = useAuth();
+const DashboardPage = () => {  const { token, logout, isAuthenticated, currentUser, isLoadingUser } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useToast();
+
+  // Create stable references for toast functions
+  const stableShowError = useCallback(showError, [showError]);
+  const stableShowSuccess = useCallback(showSuccess, [showSuccess]);
+  const stableShowWarning = useCallback(showWarning, [showWarning]);
 
   // Estados existentes
   const [services, setServices] = useState([]);
@@ -78,10 +84,11 @@ const DashboardPage = () => {
         setServicesError('');
         try {
           const servicesData = await getServicesByEstablishment(establishmentId);
-          setServices(servicesData);
-        } catch (error) {
+          setServices(servicesData);        } catch (error) {
           console.error("Erro ao buscar serviços:", error);
-          setServicesError(error.detail || error.message || 'Falha ao carregar serviços.');
+          const errorMsg = error.detail || error.message || 'Falha ao carregar serviços.';
+          setServicesError(errorMsg);
+          stableShowError(`Erro ao carregar serviços: ${errorMsg}`);
         } finally {
           setIsLoadingServices(false);
         }
@@ -116,19 +123,21 @@ const DashboardPage = () => {
 
     if (!isLoadingUser) {
       fetchData();
-    }
-  }, [isAuthenticated, currentUser, isLoadingUser]);
+    }  }, [isAuthenticated, currentUser, isLoadingUser, stableShowError]);
 
   // Funções existentes
   const handleCreateService = async (event) => {
     event.preventDefault();
-    setCreateServiceError('');
-    if (!newServiceName || !newServicePrice || !newServiceDuration) {
-      setCreateServiceError('Nome, preço e duração são obrigatórios.');
+    setCreateServiceError('');    if (!newServiceName || !newServicePrice || !newServiceDuration) {
+      const errorMsg = 'Nome, preço e duração são obrigatórios.';
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
       return;
     }
     if (!currentUser?.establishment?.id) {
-      setCreateServiceError("Não foi possível identificar o estabelecimento do usuário.");
+      const errorMsg = "Não foi possível identificar o estabelecimento do usuário.";
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
       return;
     }
 
@@ -146,10 +155,11 @@ const DashboardPage = () => {
       const newService = await createServiceForEstablishment(establishmentId, serviceData);
       setServices(prevServices => [newService, ...prevServices]);
       handleCancelEdit();
-      alert('Serviço adicionado com sucesso!');
+      stableShowSuccess('Serviço adicionado com sucesso!');
     } catch (error) {
-      console.error("Erro ao criar serviço:", error);
-      setCreateServiceError(error.detail || error.message || 'Falha ao criar serviço.');
+      console.error("Erro ao criar serviço:", error);      const errorMsg = error.detail || error.message || 'Falha ao criar serviço.';
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
     } finally {
       setIsCreatingService(false);
     }
@@ -177,15 +187,17 @@ const DashboardPage = () => {
       description: newServiceDescription || null,
       price: parseFloat(newServicePrice),
       duration_minutes: parseInt(newServiceDuration, 10),
-    };
-
-    if (!updatedServiceData.name || !updatedServiceData.price || !updatedServiceData.duration_minutes) {
-      setCreateServiceError('Nome, preço e duração são obrigatórios.');
+    };    if (!updatedServiceData.name || !updatedServiceData.price || !updatedServiceData.duration_minutes) {
+      const errorMsg = 'Nome, preço e duração são obrigatórios.';
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
       setIsCreatingService(false);
       return;
     }
     if (isNaN(updatedServiceData.price) || isNaN(updatedServiceData.duration_minutes)) {
-      setCreateServiceError('Preço e duração devem ser números.');
+      const errorMsg = 'Preço e duração devem ser números.';
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
       setIsCreatingService(false);
       return;
     }
@@ -195,11 +207,12 @@ const DashboardPage = () => {
       setServices(prevServices =>
         prevServices.map(s => (s.id === editingServiceId ? updatedService : s))
       );
-      alert('Serviço atualizado com sucesso!');
+      stableShowSuccess('Serviço atualizado com sucesso!');
       handleCancelEdit();
     } catch (error) {
-      console.error("Erro ao atualizar serviço:", error);
-      setCreateServiceError(error.detail || error.message || 'Falha ao atualizar serviço.');
+      console.error("Erro ao atualizar serviço:", error);      const errorMsg = error.detail || error.message || 'Falha ao atualizar serviço.';
+      setCreateServiceError(errorMsg);
+      stableShowError(errorMsg);
     } finally {
       setIsCreatingService(false);
     }
@@ -213,9 +226,8 @@ const DashboardPage = () => {
     setNewServicePrice('');
     setNewServiceDuration('');
     setCreateServiceError('');
-  };
-
-  const handleAttemptDelete = (serviceId) => {
+  };  const handleAttemptDelete = (serviceId) => {
+    stableShowWarning('Você está prestes a excluir um serviço. Confirme na janela que se abrirá.');
     setDeletingServiceId(serviceId);
     setShowDeleteConfirmModal(true);
     setDeleteServiceError('');
@@ -225,7 +237,6 @@ const DashboardPage = () => {
     setShowDeleteConfirmModal(false);
     setDeletingServiceId(null);
   };
-
   const handleConfirmDelete = async () => {
     if (!deletingServiceId) return;
 
@@ -237,20 +248,20 @@ const DashboardPage = () => {
       setServices(prevServices =>
         prevServices.filter(s => s.id !== deletingServiceId)
       );
-      alert('Serviço excluído com sucesso!');
+      stableShowSuccess('Serviço excluído com sucesso!');
       handleCancelDelete();
     } catch (error) {
-      console.error("Erro ao excluir serviço:", error);
-      setDeleteServiceError(error.detail || error.message || 'Falha ao excluir serviço.');
-      alert(`Erro ao excluir: ${error.detail || error.message || 'Falha ao excluir serviço.'}`);
+      console.error("Erro ao excluir serviço:", error);      const errorMsg = error.detail || error.message || 'Falha ao excluir serviço.';
+      setDeleteServiceError(errorMsg);
+      stableShowError(`Erro ao excluir: ${errorMsg}`);
     } finally {
       setIsDeletingService(false);
     }
   };
-
-  const handleSaveWorkingHours = async (configDataToSave) => {
-    if (!currentUser?.establishment?.id) {
-      setWorkingHoursError("Não foi possível identificar o estabelecimento do usuário para salvar horários.");
+  const handleSaveWorkingHours = async (configDataToSave) => {    if (!currentUser?.establishment?.id) {
+      const errorMsg = "Não foi possível identificar o estabelecimento do usuário para salvar horários.";
+      setWorkingHoursError(errorMsg);
+      stableShowError(errorMsg);
       return;
     }
 
@@ -262,13 +273,12 @@ const DashboardPage = () => {
       const updatedEstablishment = await updateEstablishmentWorkingHours(
         establishmentId,
         configDataToSave
-      );
-      setWorkingHoursConfig(updatedEstablishment.working_hours_config);
-      alert('Horários de atendimento salvos com sucesso!');
+      );      setWorkingHoursConfig(updatedEstablishment.working_hours_config);
+      stableShowSuccess('Horários de atendimento salvos com sucesso!');
     } catch (error) {
-      console.error("Erro ao salvar horários:", error);
-      setWorkingHoursError(error.detail || error.message || 'Falha ao salvar horários.');
-      alert(`Erro ao salvar horários: ${error.detail || error.message || 'Falha ao salvar horários.'}`);
+      console.error("Erro ao salvar horários:", error);      const errorMsg = error.detail || error.message || 'Falha ao salvar horários.';
+      setWorkingHoursError(errorMsg);
+      stableShowError(`Erro ao salvar horários: ${errorMsg}`);
     } finally {
       setIsSavingHours(false);
     }
@@ -515,9 +525,8 @@ const DashboardPage = () => {
                   {/* Services List */}
                   <Card>
                     <h3 className="text-lg font-semibold text-secondary-900 mb-6">Serviços Cadastrados</h3>
-                    
-                    {isLoadingServices ? (
-                      <LoadingState message="Carregando serviços..." />
+                      {isLoadingServices ? (
+                      <ServiceSkeleton />
                     ) : servicesError ? (
                       <Alert type="error">{servicesError}</Alert>
                     ) : services.length === 0 ? (
@@ -675,7 +684,7 @@ const DashboardPage = () => {
             {activeTab === 'schedule' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-secondary-900">Agenda de Agendamentos</h2>
+                  <h2 className="text-2xl font-bold text-secondary-900">Agendamentos</h2>
                   <Button>
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -707,9 +716,7 @@ const DashboardPage = () => {
                       isLoading={isSavingHours}
                       error={workingHoursError}
                     />
-                  )}
-                  
-                  {!isLoadingWorkingHours && servicesError && !workingHoursConfig && (
+                  )}                  {!isLoadingWorkingHours && servicesError && !workingHoursConfig && (
                     <Alert type="error">Erro ao carregar configuração de horários: {workingHoursError}</Alert>
                   )}
                 </Card>
