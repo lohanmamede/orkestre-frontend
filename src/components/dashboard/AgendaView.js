@@ -10,12 +10,33 @@ import Button from '../common/Button';
 import Badge from '../common/Badge';
 import '../../styles/agenda.css';
 
+// Função utilitária para formatar nomes
+const formatCustomerName = (fullName) => {
+  if (!fullName || typeof fullName !== 'string') return '';
+  
+  const nameParts = fullName.trim().split(/\s+/);
+  
+  if (nameParts.length === 1) {
+    // Se há apenas um nome, retorna com a primeira letra maiúscula
+    return nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1).toLowerCase();
+  }
+  
+  // Primeiro nome com primeira letra maiúscula
+  const firstName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1).toLowerCase();
+  
+  // Última parte do nome (sobrenome) com inicial maiúscula seguida de ponto
+  const lastName = nameParts[nameParts.length - 1];
+  const lastInitial = lastName.charAt(0).toUpperCase() + '.';
+  
+  return `${firstName} ${lastInitial}`;
+};
+
 const AgendaView = () => {
   const { currentUser } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');  const [view, setView] = useState('month'); // 'week', 'month', 'year'
+  const [error, setError] = useState('');const [view, setView] = useState('month'); // 'week', 'month', 'year'
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dayViewType, setDayViewType] = useState('cards'); // 'cards' ou 'timeline'
@@ -503,7 +524,7 @@ const WeekView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
                   <div
                     key={appt.id}
                     className="text-xs p-1 bg-primary-100 text-primary-800 rounded truncate"
-                    title={`${format(parseISO(appt.start_time), 'HH:mm')} - ${appt.customer_name}`}
+                    title={`${format(parseISO(appt.start_time), 'HH:mm')} - ${formatCustomerName(appt.customer_name)}`}
                   >
                     {format(parseISO(appt.start_time), 'HH:mm')}
                   </div>
@@ -626,17 +647,16 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
   return (
     <div className={`border rounded-lg p-3 agenda-appointment-card agenda-fade-in ${getStatusClass(appointment.status)} ${
       detailed ? 'bg-white' : 'bg-secondary-50'
-    }`}>
-      <div className="flex items-start justify-between mb-2">
+    }`}>      <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
             <span className="font-medium text-secondary-900 truncate">
-              {appointment.customer_name}
+              {formatCustomerName(appointment.customer_name)}
             </span>
             <Badge variant={getStatusColor(appointment.status)} size="sm">
               {getStatusLabel(appointment.status)}
             </Badge>
-          </div>          <div className="text-sm text-secondary-600">
+          </div><div className="text-sm text-secondary-600">
             <div className="flex items-center space-x-4">
               <span className="flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -966,7 +986,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                               ${getStatusColor(appointment.status)}
                             `}
                             style={{ width: `${Math.max(widthPercentage, 30)}%`, minWidth: '180px' }}
-                            title={`${appointment.customer_name} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
+                            title={`${formatCustomerName(appointment.customer_name)} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
                           >
                             {/* Conteúdo compacto */}                            <div className="flex items-center justify-between h-6 w-full">
                               <div className="flex items-center space-x-1.5 flex-1 min-w-0 pr-3">
@@ -975,9 +995,8 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                                 </div>                                <div className="flex-1 min-w-0">
                                   <div className="flex items-center space-x-2">                                    <span className="text-xs opacity-75 font-medium">
                                       {startTime}
-                                    </span>
-                                    <span className="font-medium text-xs truncate max-w-20">
-                                      {appointment.customer_name.split(' ')[0]}
+                                    </span>                                    <span className="font-medium text-xs truncate max-w-20">
+                                      {formatCustomerName(appointment.customer_name)}
                                     </span>
                                     {service && (
                                       <span className="text-xs opacity-60 truncate max-w-16">
