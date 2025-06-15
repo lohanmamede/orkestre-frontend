@@ -459,7 +459,7 @@ const AppointmentStatusDisplay = ({ appointment, onUpdate, variant = 'default' }
       CONFIRMED: 'status-confirmed',
       COMPLETED: 'status-completed',
       CANCELLED: 'status-cancelled',
-      NO_SHOW: 'status-no-show'
+      NO_SHOW: 'status-no_show'
     };
     return `status-badge ${classes[status] || ''}`;
   };
@@ -614,7 +614,7 @@ export default AppointmentStatusDisplay;
   border: 1px solid #f5c6cb;
 }
 
-.status-no-show {
+.status-no_show {
   background: #e2e3e5;
   color: #383d41;
   border: 1px solid #d6d8db;
@@ -675,7 +675,7 @@ export default AppointmentStatusDisplay;
   color: white;
 }
 
-.btn-no-show {
+.btn-no_show {
   background: #6c757d;
   color: white;
 }

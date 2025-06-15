@@ -1,22 +1,44 @@
-# 📊 **MATRIZ COMPLETA DE TRANSIÇÕES DE STATUS**
+# 📊 **MATRIZ FLEXÍVEL DE TRANSIÇÕES DE STATUS**
 
-## 🎯 **OBJETIVO**
-Este documento define **TODOS** os cenários possíveis de transição de status em agendamentos, considerando contexto temporal, regras de negócio e validações necessárias.
+## 🎯 **FILOSOFIA DO SISTEMA**
+
+### **🤝 Assistente Prestativo vs 👮 Gerente Autoritário**
+
+Este sistema foi projetado para ser um **assistente inteligente** que:
+- **Previne erros graves** (regras de integridade)
+- **Alerta sobre situações incomuns** (diretrizes flexíveis)  
+- **Respeita o fluxo real** dos estabelecimentos
+- **Mantém dados consistentes** sem ser restritivo
+
+### **📊 Níveis de Validação**
+
+```javascript
+const VALIDATION_LEVELS = {
+  OK: 'Permitido sem restrições',
+  WARN: 'Permitido com aviso e confirmação', 
+  BLOCK: 'Bloqueado por regra de integridade',
+  ADMIN: 'Apenas com permissão administrativa'
+}
+```
 
 ---
 
-## 📋 **STATUS DISPONÍVEIS NO SISTEMA**
+## � **MATRIZ INTELIGENTE DE TRANSIÇÕES**
+
+### **📋 STATUS DISPONÍVEIS**
 
 ```javascript
 const APPOINTMENT_STATUS = {
-  PENDING: 'pending',                    // Aguardando confirmação
-  CONFIRMED: 'confirmed',                // Confirmado pelo cliente/estabelecimento
-  COMPLETED: 'completed',                // Serviço realizado com sucesso
-  CANCELLED_BY_ESTABLISHMENT: 'cancelled_by_establishment', // Cancelado pelo salão
-  CANCELLED_BY_CLIENT: 'cancelled_by_client',             // Cancelado pelo cliente
-  NO_SHOW: 'no-show',                   // Cliente não compareceu
-  RESCHEDULED: 'rescheduled',           // Reagendado (novo status sugerido)
-  IN_PROGRESS: 'in_progress'            // Em atendimento (novo status sugerido)
+  PENDING: 'pending',                             // Aguardando confirmação
+  CONFIRMED: 'confirmed',                         // Confirmado 
+  COMPLETED: 'completed',                         // Serviço realizado
+  CANCELLED_BY_ESTABLISHMENT: 'cancelled_by_establishment',  // Cancelado pelo estabelecimento
+  CANCELLED_BY_CLIENT: 'cancelled_by_client',     // Cancelado pelo cliente
+  NO_SHOW: 'no_show',                            // Cliente não compareceu
+  
+  // Status opcionais para futuras implementações
+  RESCHEDULED: 'rescheduled',                    // Reagendado
+  IN_PROGRESS: 'in_progress'                     // Em atendimento
 }
 ```
 
@@ -41,41 +63,508 @@ const TIME_CATEGORIES = {
 
 ### **📅 FROM: PENDING (Aguardando Confirmação)**
 
-#### **DISTANT_FUTURE (>24h futuro)**
+#### **FILOSOFIA:** Cliente agendou mas ainda não confirmou presença
+
 ```javascript
-ALLOWED_TRANSITIONS: {
+TRANSITIONS_FROM_PENDING: {
+  
   'confirmed': {
-    permission: 'ANY_USER',
-    confirmation: 'NONE',
-    validation: 'BASIC',
-    message: 'Agendamento confirmado com sucesso!'
+    level: 'OK',
+    temporal_restrictions: 'NONE',
+    message: 'Agendamento confirmado com sucesso!',
+    business_logic: 'Fluxo normal esperado'
   },
+  
+  'completed': {
+    level: 'WARN',  // Flexível - pode ser atendimento antecipado
+    temporal_restrictions: {
+      future: {
+        message: "Este agendamento ainda não aconteceu. Foi um atendimento antecipado?",
+        options: [
+          "Sim, cliente chegou mais cedo e foi atendido",
+          "Sim, serviço foi mais rápido que esperado", 
+          "Não, foi erro - cancelar ação"
+        ],
+        requires_confirmation: true
+      },
+      current: {
+        level: 'OK',
+        message: 'Atendimento realizado no horário'
+      },
+      past: {
+        level: 'WARN',
+        message: 'Marcando como concluído com atraso no registro. Confirma?',
+        requires_reason: 'optional'
+      }
+    },
+    business_cases: [
+      "Cliente chegou mais cedo",
+      "Encaixe entre outros atendimentos", 
+      "Erro de registro - estava confirmado mentalmente"
+    ]
+  },
+  
   'cancelled_by_establishment': {
-    permission: 'STAFF_ADMIN',
-    confirmation: 'SIMPLE',
-    validation: 'REASON_OPTIONAL',
-    message: 'Agendamento cancelado. Cliente será notificado.'
+    level: 'OK',
+    requires_reason: 'optional',
+    message: 'Agendamento cancelado pelo estabelecimento'
   },
+  
   'cancelled_by_client': {
-    permission: 'ANY_USER',
-    confirmation: 'SIMPLE',
-    validation: 'REASON_OPTIONAL',
-    message: 'Cancelamento do cliente registrado.'
+    level: 'OK', 
+    requires_reason: 'optional',
+    message: 'Cancelamento do cliente registrado'
   },
-  'rescheduled': {
-    permission: 'ANY_USER',
-    confirmation: 'SIMPLE',
-    validation: 'NEW_DATE_REQUIRED',
-    message: 'Agendamento reagendado. Novo horário definido.'
+    'no_show': {
+    level: 'WARN',  // Flexível - pode ter esquecido de confirmar
+    temporal_restrictions: {
+      future: {
+        level: 'BLOCK',
+        message: 'Não é possível marcar falta antes do horário do agendamento'
+      },
+      current_grace_period: {
+        level: 'OK',
+        message: 'Cliente não compareceu no horário'
+      },
+      past_grace_period: {
+        level: 'WARN',
+        message: 'Registrando falta após período recomendado. Confirma que foi realmente falta?',
+        options: [
+          "Sim, cliente não veio",
+          "Na verdade, cliente chegou e foi atendido",
+          "Cliente cancelou mas esqueci de registrar"
+        ]
+      }
+    },
+    business_cases: [
+      "Cliente não confirmou e não veio",
+      "Cliente confirmou por telefone mas sistema não foi atualizado"
+    ]
   }
 }
+```
 
-BLOCKED_TRANSITIONS: {
-  'completed': 'Não é possível concluir agendamento antes do horário marcado',
-  'no-show': 'Cliente ainda não deveria ter comparecido',
-  'in_progress': 'Agendamento está muito distante para iniciar atendimento'
+### **✅ FROM: CONFIRMED (Confirmado)**
+
+#### **FILOSOFIA:** Cliente confirmou presença, expectativa alta de comparecimento
+
+```javascript
+TRANSITIONS_FROM_CONFIRMED: {
+  
+  'pending': {
+    level: 'WARN',  // Pode ter motivos válidos
+    temporal_restrictions: {
+      distant_future: {
+        level: 'OK',
+        message: 'Confirmação revertida'
+      },
+      near_future: {
+        level: 'WARN',
+        message: 'Reverter confirmação próximo ao horário pode causar transtornos. Confirma?',
+        requires_reason: true,
+        options: [
+          "Cliente pediu para reverter",
+          "Erro na confirmação",
+          "Reagendamento necessário"
+        ]
+      },
+      imminent: {
+        level: 'WARN',
+        message: 'Reversão de última hora. Motivo:',
+        requires_reason: true,
+        requires_double_confirmation: true
+      }
+    },
+    business_cases: [
+      "Cliente mudou de ideia",
+      "Conflito de horário descoberto",
+      "Erro na confirmação original"
+    ]
+  },
+  
+  'completed': {
+    level: 'OK',
+    temporal_restrictions: {
+      future: {
+        level: 'WARN',
+        message: 'Marcando como concluído antes do horário. Foi antecipado?',
+        requires_confirmation: true
+      },
+      current: {
+        level: 'OK',
+        message: 'Atendimento realizado conforme agendado'
+      },
+      past: {
+        level: 'OK', 
+        message: 'Atendimento concluído'
+      }
+    }
+  },
+  
+  'cancelled_by_establishment': {
+    level: 'WARN',  // Mais grave pois cliente confirmou
+    temporal_restrictions: {
+      distant_future: {
+        level: 'WARN',
+        requires_reason: true,
+        message: 'Cancelando agendamento confirmado. Motivo:'
+      },
+      near_future: {
+        level: 'WARN',
+        requires_reason: true,
+        requires_double_confirmation: true,
+        message: 'Cancelamento com pouco tempo. Cliente pode ser compensado.'
+      },
+      imminent: {
+        level: 'ADMIN',  // Requer supervisão
+        message: 'Cancelamento de emergência. Requer aprovação administrativa.',
+        requires_supervisor_approval: true
+      }
+    }
+  },
+  
+  'cancelled_by_client': {
+    level: 'OK',
+    temporal_restrictions: {
+      imminent: {
+        level: 'WARN',
+        message: 'Cliente cancelou de última hora. Aplicar taxa de cancelamento?',
+        requires_reason: true
+      }
+    }
+  },
+  
+  'no-show': {
+    level: 'OK',
+    temporal_restrictions: {
+      future: {
+        level: 'BLOCK',
+        message: 'Não é possível marcar falta antes do horário'
+      },
+      grace_period: {
+        level: 'OK',
+        message: 'Cliente confirmado não compareceu'
+      },
+      extended_period: {
+        level: 'WARN',
+        message: 'Registrando falta após período estendido. Confirma?'
+      }
+    }
+  }
 }
 ```
+
+### **🎉 FROM: COMPLETED (Concluído)**
+
+#### **FILOSOFIA:** Estado final - alterações devem ser raríssimas
+
+```javascript
+TRANSITIONS_FROM_COMPLETED: {
+  
+  // REGRAS DE INTEGRIDADE - Geralmente bloqueadas
+  'pending': {
+    level: 'BLOCK',
+    message: 'Um serviço já realizado não pode voltar a ser pendente',
+    exception: {
+      level: 'ADMIN',
+      condition: 'EMERGENCY_DATA_CORRECTION',
+      requires_supervisor_approval: true,
+      audit_level: 'CRITICAL'
+    }
+  },
+  
+  'confirmed': {
+    level: 'BLOCK', 
+    message: 'Um serviço já realizado não pode voltar a ser apenas confirmado',
+    exception: {
+      level: 'ADMIN',
+      condition: 'EMERGENCY_DATA_CORRECTION'
+    }
+  },
+  
+  'cancelled_by_establishment': {
+    level: 'BLOCK',
+    message: 'Não é possível cancelar um serviço já realizado',
+    exception: {
+      level: 'ADMIN',
+      condition: 'BILLING_CORRECTION',
+      message: 'Correção para fins de faturamento - requer justificativa detalhada'
+    }
+  },
+  
+  'cancelled_by_client': {
+    level: 'BLOCK',
+    message: 'Cliente não pode cancelar serviço já realizado'
+  },
+  
+  'no-show': {
+    level: 'BLOCK',
+    message: 'Cliente foi atendido, não pode ser marcado como falta',
+    exception: {
+      level: 'ADMIN', 
+      condition: 'DATA_CORRECTION',
+      message: 'Correção: cliente na verdade não compareceu'
+    }
+  }
+}
+```
+
+### **❌ FROM: CANCELLED_BY_ESTABLISHMENT**
+
+#### **FILOSOFIA:** Estado final, mas pode ter correções por erro
+
+```javascript
+TRANSITIONS_FROM_CANCELLED_ESTABLISHMENT: {
+  
+  'pending': {
+    level: 'WARN',  // Possível se erro ou mudança de situação
+    temporal_restrictions: {
+      same_day: {
+        level: 'WARN',
+        message: 'Reativar agendamento cancelado. Confirma que há disponibilidade?',
+        requires_availability_check: true
+      },
+      future_days: {
+        level: 'BLOCK',
+        message: 'Agendamento muito antigo para reativar - criar novo agendamento'
+      }
+    },
+    business_cases: [
+      "Cancelamento foi engano",
+      "Situação que causou cancelamento foi resolvida",
+      "Cliente negociou e agendamento pode continuar"
+    ]
+  },
+  
+  'confirmed': {
+    level: 'WARN',
+    condition: 'MUST_GO_THROUGH_PENDING',
+    message: 'Para reativar, primeiro mude para pendente, depois confirme'
+  },
+  
+  // Outros states permanecem bloqueados
+  'completed': {
+    level: 'BLOCK',
+    message: 'Agendamento foi cancelado, não pode ser concluído'
+  },
+  
+  'no-show': {
+    level: 'BLOCK', 
+    message: 'Agendamento foi cancelado, cliente não deveria comparecer'
+  }
+}
+```
+
+### **❌ FROM: CANCELLED_BY_CLIENT**
+
+#### **FILOSOFIA:** Cliente cancelou, mas pode querer reativar
+
+```javascript
+TRANSITIONS_FROM_CANCELLED_CLIENT: {
+  
+  'pending': {
+    level: 'WARN',  // Cliente pode mudar de ideia
+    temporal_restrictions: {
+      same_day: {
+        level: 'WARN',
+        message: 'Cliente quer reativar agendamento. Verificar disponibilidade:',
+        requires_availability_check: true,
+        requires_staff_approval: true
+      },
+      future: {
+        level: 'OK',
+        message: 'Reativação de agendamento solicitada pelo cliente'
+      }
+    },
+    business_cases: [
+      "Cliente mudou de ideia",
+      "Situação que levou ao cancelamento foi resolvida",
+      "Cancelamento foi mal-entendido"
+    ]
+  },
+  
+  // Outros permanecem similares ao cancelled_by_establishment
+}
+```
+
+### **👻 FROM: NO_SHOW (Falta)**
+
+#### **FILOSOFIA:** Cliente faltou, mas pode ter chegado tarde
+
+```javascript
+TRANSITIONS_FROM_NO_SHOW: {
+  
+  'completed': {
+    level: 'WARN',  // Cliente pode ter chegado tarde
+    temporal_restrictions: {
+      same_day: {
+        level: 'WARN',
+        message: 'Cliente chegou após ser marcado como falta?',
+        requires_confirmation: true,
+        options: [
+          "Sim, chegou atrasado e foi atendido",
+          "Sim, ligou e foi atendido por telefone",
+          "Não, foi erro na marcação de falta"
+        ]
+      },
+      next_day: {
+        level: 'ADMIN',
+        message: 'Correção de falta do dia anterior requer supervisão'
+      }
+    },
+    business_cases: [
+      "Cliente chegou muito atrasado mas foi atendido",
+      "Atendimento foi feito remotamente",
+      "Erro na marcação original de falta"
+    ]
+  },
+  
+  'pending': {
+    level: 'WARN',
+    message: 'Reverter falta para pendente. Cliente quer reagendar?',
+    condition: 'SHOULD_CREATE_NEW_APPOINTMENT'
+  },
+  
+  // Outros geralmente bloqueados
+  'confirmed': {
+    level: 'BLOCK',
+    message: 'Cliente faltou, não pode ser confirmado. Criar novo agendamento.'
+  }
+}
+```
+
+---
+
+## 🎯 **IMPLEMENTAÇÃO PRÁTICA**
+
+### **Interface de Validação Flexível**
+
+```javascript
+const validateTransition = (currentStatus, targetStatus, appointmentData) => {
+  const rule = TRANSITION_MATRIX[currentStatus][targetStatus];
+  
+  switch(rule.level) {
+    case 'OK':
+      return { allowed: true, message: rule.message };
+      
+    case 'WARN':
+      return {
+        allowed: true,
+        requiresConfirmation: true,
+        warningMessage: rule.message,
+        options: rule.options || ['Confirmar', 'Cancelar'],
+        businessCases: rule.business_cases
+      };
+      
+    case 'BLOCK':
+      return {
+        allowed: false,
+        message: rule.message,
+        hasException: !!rule.exception,
+        exceptionRequirements: rule.exception
+      };
+      
+    case 'ADMIN':
+      return {
+        allowed: false,
+        requiresElevatedPermission: true,
+        message: rule.message,
+        requirements: rule.requirements
+      };
+  }
+};
+```
+
+### **Modal de Confirmação Contextual**
+
+```javascript
+const StatusConfirmationModal = ({ transition, onConfirm, onCancel }) => {
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  
+  return (
+    <Modal>
+      <h3>{transition.warningMessage}</h3>
+      
+      {transition.businessCases && (
+        <div className="business-cases">
+          <p>Situações comuns:</p>
+          {transition.businessCases.map(case => (
+            <label key={case}>
+              <input 
+                type="radio" 
+                value={case}
+                checked={selectedReason === case}
+                onChange={() => setSelectedReason(case)}
+              />
+              {case}
+            </label>
+          ))}
+          <label>
+            <input 
+              type="radio"
+              value="other"
+              checked={selectedReason === 'other'}
+              onChange={() => setSelectedReason('other')}
+            />
+            Outro motivo:
+            <input 
+              type="text"
+              value={customReason}
+              onChange={(e) => setCustomReason(e.target.value)}
+              disabled={selectedReason !== 'other'}
+            />
+          </label>
+        </div>
+      )}
+      
+      <div className="modal-actions">
+        <button onClick={onCancel}>Cancelar</button>
+        <button 
+          onClick={() => onConfirm(selectedReason === 'other' ? customReason : selectedReason)}
+          disabled={!selectedReason}
+        >
+          Confirmar Ação
+        </button>
+      </div>
+    </Modal>
+  );
+};
+```
+
+---
+
+## 🎨 **EXPERIÊNCIA DO USUÁRIO**
+
+### **Mensagens Amigáveis e Educativas**
+
+Em vez de:
+❌ "Ação não permitida"
+
+Usamos:
+✅ "Este agendamento ainda não aconteceu. Foi um atendimento antecipado? Se sim, confirme que o serviço já foi realizado."
+
+### **Sugestões Inteligentes**
+
+```javascript
+const getSuggestion = (currentStatus, appointmentTime) => {
+  if (currentStatus === 'pending' && isAfter(new Date(), appointmentTime)) {
+    return {
+      type: 'suggestion',
+      message: 'Este agendamento já passou. O que aconteceu?',
+      quickActions: [
+        { label: 'Cliente veio e foi atendido', action: 'completed' },
+        { label: 'Cliente não apareceu', action: 'no_show' },
+        { label: 'Foi cancelado', action: 'cancelled_by_client' }
+      ]
+    };
+  }
+};
+```
+
+---
+
+*Este sistema balanceia **integridade de dados** com **flexibilidade operacional**, sempre respeitando o contexto real dos estabelecimentos.*
 
 #### **NEAR_FUTURE (2-24h futuro)**
 ```javascript
@@ -110,7 +599,7 @@ ALLOWED_TRANSITIONS: {
 
 BLOCKED_TRANSITIONS: {
   'completed': 'Agendamento ainda não ocorreu',
-  'no-show': 'Muito cedo para marcar como falta',
+  'no_show': 'Muito cedo para marcar como falta',
   'in_progress': 'Agendamento ainda não chegou na hora de começar'
 }
 ```
@@ -149,7 +638,7 @@ ALLOWED_TRANSITIONS: {
 
 BLOCKED_TRANSITIONS: {
   'completed': 'Aguarde o horário do agendamento',
-  'no-show': 'Aguarde pelo menos 15 minutos de atraso',
+  'no_show': 'Aguarde pelo menos 15 minutos de atraso',
   'in_progress': 'Ainda não chegou a hora de iniciar'
 }
 ```
