@@ -119,18 +119,62 @@ const AgendaView = () => {
       grouped[dateKey].push(appt);
     });
     return grouped;
-  }, [appointments]);  // Função para obter densidade de agendamentos
+  }, [appointments]);  // Função para calcular distribuição dinâmica baseada no contexto
+  const calculateDynamicRanges = (counts) => {
+    if (counts.length === 0) return [0, 1, 2, 3, 4];
+    
+    const validCounts = counts.filter(count => count > 0);
+    if (validCounts.length === 0) return [0, 1, 2, 3, 4];
+    
+    const maxCount = Math.max(...validCounts);
+    const minCount = Math.min(...validCounts);
+    
+    // Encontrar o primeiro múltiplo de 5 após o valor máximo
+    const maxMultipleOf5 = Math.ceil(maxCount / 5) * 5;
+    
+    // Se o múltiplo de 5 for muito pequeno (≤ 5), usar pelo menos 5
+    const finalMax = Math.max(maxMultipleOf5, 5);
+    
+    // Dividir em 5 ranges uniformes
+    const step = finalMax / 5;
+    
+    return [
+      0,
+      step,
+      step * 2,
+      step * 3,
+      step * 4
+    ];
+  };
+
+  // Calcular ranges dinâmicos para dias do mês atual
+  const getMonthDayRanges = useMemo(() => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    const dayCounts = monthDays.map(day => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      return (appointmentsByDate[dateKey] || []).length;
+    });
+    
+    return calculateDynamicRanges(dayCounts);
+  }, [currentDate, appointmentsByDate]);
+
+  // Função para obter densidade de agendamentos
   const getDateIntensity = (date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     const dayAppointments = appointmentsByDate[dateKey] || [];
     const count = dayAppointments.length;
+    const [r0, r1, r2, r3, r4] = getMonthDayRanges;
     
     if (count === 0) return '';
-    if (count >= 1 && count <= 2) return 'bg-primary-50 text-primary-700';
-    if (count >= 3 && count <= 4) return 'bg-primary-200 text-primary-800';
-    if (count >= 5 && count <= 6) return 'bg-primary-400 text-white';
-    return 'bg-primary-600 text-white font-bold';
-  };  const handleStatusChange = async (appointmentId, newStatus) => {
+    if (count >= r1 && count < r2) return 'bg-primary-50 text-primary-700';
+    if (count >= r2 && count < r3) return 'bg-primary-200 text-primary-800';
+    if (count >= r3 && count < r4) return 'bg-primary-400 text-white';
+    if (count >= r4) return 'bg-primary-600 text-white font-bold';
+    return 'bg-primary-50 text-primary-700';
+  };const handleStatusChange = async (appointmentId, newStatus) => {
     try {
       const updatedAppointment = await updateAppointmentStatus(appointmentId, newStatus);
       setAppointments(prev => 
@@ -330,6 +374,7 @@ const AgendaView = () => {
                 getDateIntensity={getDateIntensity}
                 selectedDate={selectedDate}
                 setSelectedDate={setSelectedDate}
+                getMonthDayRanges={getMonthDayRanges}
               />}
               {view === 'week' && <WeekView 
                 currentDate={currentDate}
@@ -423,7 +468,7 @@ const AgendaView = () => {
 };
 
 // Componente de Visualização Mensal
-const MonthView = ({ currentDate, appointmentsByDate, getDateIntensity, selectedDate, setSelectedDate }) => {
+const MonthView = ({ currentDate, appointmentsByDate, getDateIntensity, selectedDate, setSelectedDate, getMonthDayRanges }) => {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart, { locale: ptBR });
@@ -483,6 +528,38 @@ const MonthView = ({ currentDate, appointmentsByDate, getDateIntensity, selected
             </button>
           );
         })}
+      </div>
+        {/* Legenda de Atividade para o Mês */}
+      <div className="mt-4 p-3 bg-secondary-50 rounded-lg">
+        <h4 className="text-sm font-medium text-secondary-900 mb-3">Legenda de Atividade do Mês:</h4>
+        <div className="grid grid-cols-5 gap-2 text-xs">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-secondary-50 border border-secondary-200 rounded"></div>
+            <span className="text-secondary-600">{getMonthDayRanges[0]}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-primary-50 border border-primary-100 rounded"></div>
+            <span className="text-secondary-600">
+              {getMonthDayRanges[1]}{getMonthDayRanges[2] > getMonthDayRanges[1] + 1 ? `-${getMonthDayRanges[2] - 1}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-primary-200 border border-primary-200 rounded"></div>
+            <span className="text-secondary-600">
+              {getMonthDayRanges[2]}{getMonthDayRanges[3] > getMonthDayRanges[2] + 1 ? `-${getMonthDayRanges[3] - 1}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-primary-400 border border-primary-400 rounded"></div>
+            <span className="text-secondary-600">
+              {getMonthDayRanges[3]}{getMonthDayRanges[4] > getMonthDayRanges[3] + 1 ? `-${getMonthDayRanges[4] - 1}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-primary-600 border border-primary-600 rounded"></div>
+            <span className="text-secondary-600">{getMonthDayRanges[4]}+</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -675,7 +752,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
               {service && (
                 <span className="flex items-center text-secondary-700 font-medium">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" />
                   </svg>
                   {service.name}
                 </span>
@@ -756,6 +833,43 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
 const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDate }) => {
   const currentYear = currentDate.getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
+  // Calcular ranges dinâmicos para meses do ano
+  const getYearMonthRanges = useMemo(() => {
+    const monthCounts = months.map(month => {
+      const year = month.getFullYear();
+      const monthIndex = month.getMonth();
+      
+      let totalAppointments = 0;
+      for (let day = 1; day <= new Date(year, monthIndex + 1, 0).getDate(); day++) {
+        const dateKey = format(new Date(year, monthIndex, day), 'yyyy-MM-dd');
+        const dayAppointments = appointmentsByDate[dateKey] || [];
+        totalAppointments += dayAppointments.length;
+      }
+      return totalAppointments;
+    });
+    
+    const validCounts = monthCounts.filter(count => count > 0);
+    if (validCounts.length === 0) return [0, 1, 2, 3, 4];
+    
+    const maxCount = Math.max(...validCounts);
+    
+    // Encontrar o primeiro múltiplo de 5 após o valor máximo
+    const maxMultipleOf5 = Math.ceil(maxCount / 5) * 5;
+    
+    // Se o múltiplo de 5 for muito pequeno (≤ 5), usar pelo menos 5
+    const finalMax = Math.max(maxMultipleOf5, 5);
+    
+    // Dividir em 5 ranges uniformes
+    const step = finalMax / 5;
+    
+    return [
+      0,
+      step,
+      step * 2,
+      step * 3,
+      step * 4
+    ];
+  }, [currentDate, appointmentsByDate, months]);
 
   // Função para obter intensidade de agendamentos por mês
   const getMonthIntensity = (month) => {
@@ -770,11 +884,14 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
       totalAppointments += dayAppointments.length;
     }
     
+    const [r0, r1, r2, r3, r4] = getYearMonthRanges;
+    
     if (totalAppointments === 0) return 'bg-secondary-50 text-secondary-600';
-    if (totalAppointments >= 1 && totalAppointments <= 5) return 'bg-primary-50 text-primary-700 border border-primary-100';
-    if (totalAppointments >= 6 && totalAppointments <= 15) return 'bg-primary-200 text-primary-800 border border-primary-200';
-    if (totalAppointments >= 16 && totalAppointments <= 30) return 'bg-primary-400 text-white border border-primary-400';
-    return 'bg-primary-600 text-white border border-primary-600 font-bold';
+    if (totalAppointments >= r1 && totalAppointments < r2) return 'bg-primary-50 text-primary-700 border border-primary-100';
+    if (totalAppointments >= r2 && totalAppointments < r3) return 'bg-primary-200 text-primary-800 border border-primary-200';
+    if (totalAppointments >= r3 && totalAppointments < r4) return 'bg-primary-400 text-white border border-primary-400';
+    if (totalAppointments >= r4) return 'bg-primary-600 text-white border border-primary-600 font-bold';
+    return 'bg-primary-50 text-primary-700 border border-primary-100';
   };
 
   const getMonthAppointmentCount = (month) => {
@@ -797,6 +914,7 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
           const isCurrentMonth = isSameMonth(month, new Date());
           const isSelectedMonth = isSameMonth(month, selectedDate);
           const appointmentCount = getMonthAppointmentCount(month);
+          const [r0, r1, r2, r3, r4] = getYearMonthRanges;
           
           return (
             <button
@@ -811,31 +929,32 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
             >
               <div className="text-sm font-medium mb-1">
                 {format(month, 'MMM', { locale: ptBR })}
-              </div>              <div className="text-xs opacity-75">
+              </div>
+              <div className="text-xs opacity-75">
                 {appointmentCount} ag.
               </div>
               
-              {/* Indicador visual de atividade */}
+              {/* Indicador visual de atividade dinâmico */}
               {appointmentCount > 0 && (
                 <div className="absolute top-2 right-2">
                   <div className="flex space-x-0.5">
-                    {appointmentCount <= 5 && (
+                    {appointmentCount >= r1 && appointmentCount < r2 && (
                       <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                     )}
-                    {appointmentCount > 5 && appointmentCount <= 15 && (
+                    {appointmentCount >= r2 && appointmentCount < r3 && (
                       <>
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                       </>
                     )}
-                    {appointmentCount > 15 && appointmentCount <= 30 && (
+                    {appointmentCount >= r3 && appointmentCount < r4 && (
                       <>
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                       </>
                     )}
-                    {appointmentCount > 30 && (
+                    {appointmentCount >= r4 && (
                       <>
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                         <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
@@ -850,33 +969,40 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
           );
         })}
       </div>
-      
-      {/* Legenda */}
+        {/* Legenda Dinâmica */}
       <div className="mt-6 p-4 bg-secondary-50 rounded-lg">
-        <h4 className="text-sm font-medium text-secondary-900 mb-3">Legenda de Atividade:</h4>        <div className="grid grid-cols-5 gap-3 text-xs">
+        <h4 className="text-sm font-medium text-secondary-900 mb-3">Legenda de Atividade do Ano:</h4>
+        <div className="grid grid-cols-5 gap-3 text-xs">
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-secondary-50 border border-secondary-200 rounded"></div>
-            <span className="text-secondary-600">0</span>
+            <span className="text-secondary-600">{getYearMonthRanges[0]}</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-primary-50 border border-primary-100 rounded"></div>
-            <span className="text-secondary-600">1-5</span>
+            <span className="text-secondary-600">
+              {getYearMonthRanges[1]}{getYearMonthRanges[2] > getYearMonthRanges[1] + 1 ? `-${getYearMonthRanges[2] - 1}` : ''}
+            </span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-primary-200 border border-primary-200 rounded"></div>
-            <span className="text-secondary-600">6-15</span>
+            <span className="text-secondary-600">
+              {getYearMonthRanges[2]}{getYearMonthRanges[3] > getYearMonthRanges[2] + 1 ? `-${getYearMonthRanges[3] - 1}` : ''}
+            </span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-primary-400 border border-primary-400 rounded"></div>
-            <span className="text-secondary-600">16-30</span>
+            <span className="text-secondary-600">
+              {getYearMonthRanges[3]}{getYearMonthRanges[4] > getYearMonthRanges[3] + 1 ? `-${getYearMonthRanges[4] - 1}` : ''}
+            </span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-primary-600 border border-primary-600 rounded"></div>
-            <span className="text-secondary-600">30+</span>
+            <span className="text-secondary-600">{getYearMonthRanges[4]}+</span>
           </div>
         </div>
       </div>
-    </div>  );
+    </div>
+  );
 };
 
 // Componente de Visualização em Timeline
@@ -982,20 +1108,23 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                             key={appointment.id}
                             className={`
                               timeline-appointment-block timeline-appointment-${appointment.status}
-                              rounded-md px-2 py-1 cursor-pointer transition-all hover:shadow-md hover:border-l-6
+                              rounded-md py-1 cursor-pointer transition-all hover:shadow-md hover:border-l-6
                               ${getStatusColor(appointment.status)}
                             `}
                             style={{ width: `${Math.max(widthPercentage, 30)}%`, minWidth: '180px' }}
                             title={`${formatCustomerName(appointment.customer_name)} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
                           >
-                            {/* Conteúdo compacto */}                            <div className="flex items-center justify-between h-6 w-full">
-                              <div className="flex items-center space-x-1.5 flex-1 min-w-0 pr-3">
+                            {/* Conteúdo compacto */}                            <div className="flex items-center justify-between h-6 w-full px-1">
+                              <div className="flex items-center space-x-1.5 flex-1 min-w-0">
                                 <div className="flex-shrink-0">
                                   {getStatusIcon(appointment.status)}
-                                </div>                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center space-x-2">                                    <span className="text-xs opacity-75 font-medium">
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-xs opacity-75 font-medium">
                                       {startTime}
-                                    </span>                                    <span className="font-medium text-xs truncate max-w-20">
+                                    </span>
+                                    <span className="font-medium text-xs truncate max-w-20">
                                       {formatCustomerName(appointment.customer_name)}
                                     </span>
                                     {service && (
@@ -1005,8 +1134,10 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                                     )}
                                   </div>
                                 </div>
-                              </div>                              {/* Botões de ação claramente separados no canto direito */}
-                              <div className="flex items-center space-x-0.5 flex-shrink-0">                                {appointment.status === 'pending' && (
+                              </div>
+                              {/* Botões de ação claramente separados no canto direito */}
+                              <div className="flex items-center space-x-0.5 flex-shrink-0">
+                                {appointment.status === 'pending' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1017,7 +1148,8 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                                   >
                                     ✓
                                   </button>
-                                )}                                {appointment.status === 'confirmed' && (
+                                )}
+                                {appointment.status === 'confirmed' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
