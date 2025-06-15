@@ -4,13 +4,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AuthProvider } from './contexts/AuthContext'; // Importa o AuthProvider
+import { ToastProvider } from './components/common/Toast'; // Importa o ToastProvider
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <AuthProvider> {/* Envolva o App com o AuthProvider */}
-      <App />
-    </AuthProvider>
+    <ToastProvider> {/* Envolva tudo com o ToastProvider */}
+      <AuthProvider> {/* Envolva o App com o AuthProvider */}
+        <App />
+      </AuthProvider>
+    </ToastProvider>
   </React.StrictMode>
 );
 
