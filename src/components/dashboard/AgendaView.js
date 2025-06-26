@@ -9,31 +9,12 @@ import { validateStatusTransition, getAllowedTransitions, AppointmentStatus, STA
 import { useToast } from '../common/Toast';
 import ConfirmationModal from '../common/ConfirmationModal';
 import CancellationModal from '../common/CancellationModal';
+import RescheduleModal from '../common/RescheduleModal';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
+import { formatCustomerName, formatPhone, formatTime } from '../../utils/formatters';
 import '../../styles/agenda.css';
-
-// Função utilitária para formatar nomes
-const formatCustomerName = (fullName) => {
-  if (!fullName || typeof fullName !== 'string') return '';
-  
-  const nameParts = fullName.trim().split(/\s+/);
-  
-  if (nameParts.length === 1) {
-    // Se há apenas um nome, retorna com a primeira letra maiúscula
-    return nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1).toLowerCase();
-  }
-  
-  // Primeiro nome com primeira letra maiúscula
-  const firstName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1).toLowerCase();
-  
-  // Última parte do nome (sobrenome) com inicial maiúscula seguida de ponto
-  const lastName = nameParts[nameParts.length - 1];
-  const lastInitial = lastName.charAt(0).toUpperCase() + '.';
-  
-  return `${firstName} ${lastInitial}`;
-};
 
 const AgendaView = () => {
   const { currentUser } = useAuth();
@@ -58,7 +39,15 @@ const AgendaView = () => {
   const [cancelModal, setCancelModal] = useState({
     isOpen: false,
     appointmentId: null
-  });// Hook para exibir toast notifications
+  });
+  
+  // Estado para o modal de reagendamento
+  const [rescheduleModal, setRescheduleModal] = useState({
+    isOpen: false,
+    appointmentId: null
+  });
+  
+  // Hook para exibir toast notifications
   const { showSuccess, showError, showWarning, showInfo } = useToast();
   // Buscar agendamentos e serviços
   useEffect(() => {
@@ -194,10 +183,21 @@ const AgendaView = () => {
     if (count >= r3 && count < r4) return 'bg-primary-400 text-white';
     if (count >= r4) return 'bg-primary-600 text-white font-bold';
     return 'bg-primary-50 text-primary-700';
-  };const handleStatusChange = async (appointmentId, newStatus) => {
+  };
+  
+  const handleStatusChange = async (appointmentId, newStatus) => {
     // Tratamento especial para o botão de cancelamento unificado
     if (newStatus === "SHOW_CANCEL_MODAL") {
       setCancelModal({
+        isOpen: true,
+        appointmentId: appointmentId
+      });
+      return;
+    }
+    
+    // Tratamento para o reagendamento
+    if (newStatus === "SHOW_RESCHEDULE_MODAL") {
+      setRescheduleModal({
         isOpen: true,
         appointmentId: appointmentId
       });
@@ -304,8 +304,48 @@ const AgendaView = () => {
     performStatusChange(cancelModal.appointmentId, cancelStatus);
   };
 
+  // Função para realizar o reagendamento após a confirmação
+  const handleRescheduleConfirm = () => {
+    // Recarregar os agendamentos após o reagendamento bem-sucedido
+    if (currentUser?.establishment?.id) {
+      const establishmentId = currentUser.establishment.id;
+      setIsLoading(true);
+      Promise.all([
+        getAppointmentsByEstablishment(establishmentId),
+        getServicesByEstablishment(establishmentId)
+      ])
+        .then(([appointmentsData, servicesData]) => {
+          const servicesMap = servicesData.reduce((acc, service) => {
+            acc[service.id] = service;
+            return acc;
+          }, {});
+          
+          setServices(servicesData);
+          setAppointments(appointmentsData);
+          showSuccess("Agendamento reagendado com sucesso!");
+        })
+        .catch(err => {
+          setError('Falha ao recarregar a agenda após reagendamento.');
+          console.error(err);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Modal de reagendamento */}
+      <RescheduleModal
+        isOpen={rescheduleModal.isOpen}
+        onClose={() => setRescheduleModal({...rescheduleModal, isOpen: false})}
+        appointment={appointments.find(appt => appt.id === rescheduleModal.appointmentId)}
+        onReschedule={handleRescheduleConfirm}
+        services={services}
+        establishmentId={currentUser?.establishment?.id}
+      />
+      
       {/* Modal de cancelamento (para escolher entre os tipos) */}
       <CancellationModal
         isOpen={cancelModal.isOpen}
@@ -854,7 +894,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       buttons.push(
         <button
           key="reschedule"
-          onClick={() => onStatusChange(appointment.id, AppointmentStatus.RESCHEDULED)}
+          onClick={() => onStatusChange(appointment.id, "SHOW_RESCHEDULE_MODAL")}
           className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors font-medium"
           title="Reagendar agendamento"
         >
@@ -997,9 +1037,10 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
                 label: "Não Compareceu",
                 variant: "outline"
               },
-              [AppointmentStatus.RESCHEDULED]: {
+              "SHOW_RESCHEDULE_MODAL": {
                 label: "Reagendar",
-                variant: "secondary"
+                variant: "secondary",
+                specialAction: "SHOW_RESCHEDULE_MODAL"
               }
             };
 
@@ -1007,16 +1048,24 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
             const canCancel = allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
                              allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT);
             
-            // Filtramos as transições, removendo os cancelamentos individuais
+            // Verificamos se o reagendamento está disponível
+            const canReschedule = allowedTransitions.includes(AppointmentStatus.RESCHEDULED);
+            
+            // Filtramos as transições, removendo os cancelamentos individuais e reagendamento
             const filteredTransitions = allowedTransitions.filter(status => 
               status !== AppointmentStatus.CANCELLED_BY_ESTABLISHMENT && 
-              status !== AppointmentStatus.CANCELLED_BY_CLIENT
+              status !== AppointmentStatus.CANCELLED_BY_CLIENT &&
+              status !== AppointmentStatus.RESCHEDULED
             );
             
-            // Se pode cancelar, adicionamos o botão unificado
-            const buttonsToRender = canCancel 
-              ? [...filteredTransitions, "CANCEL_UNIFIED"] 
-              : filteredTransitions;
+            // Adicionamos os botões especiais quando disponíveis
+            let buttonsToRender = filteredTransitions;
+            if (canCancel) {
+              buttonsToRender = [...buttonsToRender, "CANCEL_UNIFIED"];
+            }
+            if (canReschedule) {
+              buttonsToRender = [...buttonsToRender, "SHOW_RESCHEDULE_MODAL"];
+            }
             
             return buttonsToRender.map(status => {
               const button = buttonMap[status];

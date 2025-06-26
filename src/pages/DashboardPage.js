@@ -697,7 +697,12 @@ const DashboardPage = () => {  const { token, logout, isAuthenticated, currentUs
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-secondary-900">Agendamentos</h2>
-                  <Button>
+                  <Button 
+                    onClick={() => {
+                      // Abre em nova aba usando o ID do estabelecimento atual
+                      window.open(`http://localhost:3000/agendar/${currentUser?.establishment?.id}`, '_blank');
+                    }}
+                  >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>

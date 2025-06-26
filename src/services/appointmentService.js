@@ -77,6 +77,36 @@ export const updateAppointmentStatus = async (appointmentId, newStatus) => {
   }
 };
 
-// Futuramente, podemos adicionar mais funções aqui:
+// Função para atualizar a data e hora do agendamento (reagendamento)
+export const updateAppointmentDateTime = async (appointmentId, newDateTime) => {
+  try {
+    const response = await apiClient.patch(`/appointments/${appointmentId}/reschedule`, {
+      start_time: newDateTime // Nova data e hora no formato ISO
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Erro ao reagendar agendamento ${appointmentId}:`, error);
+    throw error;
+  }
+};
+
+// Função para buscar horários disponíveis considerando reagendamento
+export const getAvailableSlotsForRescheduling = async (establishmentId, serviceId, date, currentAppointmentId) => {
+  try {
+    const response = await apiClient.get(
+      `/establishments/${establishmentId}/services/${serviceId}/available-slots`,
+      {
+        params: {
+          appointment_date: date,
+          exclude_appointment_id: currentAppointmentId // Excluir o agendamento atual da verificação
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar horários disponíveis para reagendamento:", error);
+    throw error;
+  }
+};
 // - getAppointmentDetails(appointmentId)
 // - cancelAppointment(appointmentId, cancelToken)
