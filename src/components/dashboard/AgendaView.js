@@ -520,18 +520,11 @@ const AgendaView = () => {
                 </div>
               ) : (
                 dayViewType === 'cards' ? (
-                  <div className="space-y-3 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-secondary-300 scrollbar-track-secondary-100">
-                    {selectedDayAppointments
-                      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-                      .map(appt => (
-                      <AppointmentCard 
-                        key={appt.id} 
-                        appointment={appt} 
-                        getServiceForAppointment={getServiceForAppointment}
-                        onStatusChange={handleStatusChange} 
-                      />
-                    ))}
-                  </div>
+                  <CategorizedAppointmentsView 
+                    appointments={selectedDayAppointments}
+                    getServiceForAppointment={getServiceForAppointment}
+                    onStatusChange={handleStatusChange}
+                  />
                 ) : (
                   <TimelineView 
                     appointments={selectedDayAppointments}
@@ -1045,6 +1038,198 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
           })()}
         </div>
       )}
+    </div>
+  );
+};
+
+// Componente de Visualização Categorizada dos Agendamentos
+const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, onStatusChange }) => {
+  const [expandedSections, setExpandedSections] = useState({
+    pending: true,
+    inProgress: true,
+    completed: true,
+    cancelled: false
+  });
+
+  // Categorizar agendamentos por status
+  const categorizedAppointments = useMemo(() => {
+    const categories = {
+      pending: [],
+      inProgress: [],
+      completed: [],
+      cancelled: []
+    };
+
+    appointments.forEach(appointment => {
+      switch (appointment.status) {
+        case AppointmentStatus.PENDING:
+          categories.pending.push(appointment);
+          break;
+        case AppointmentStatus.CONFIRMED:
+        case AppointmentStatus.IN_PROGRESS:
+        case AppointmentStatus.RESCHEDULED:  // Reagendados ainda serão executados
+          categories.inProgress.push(appointment);
+          break;
+        case AppointmentStatus.COMPLETED:
+          categories.completed.push(appointment);
+          break;
+        case AppointmentStatus.CANCELLED_BY_CLIENT:
+        case AppointmentStatus.CANCELLED_BY_ESTABLISHMENT:
+        case AppointmentStatus.NO_SHOW:
+          categories.cancelled.push(appointment);
+          break;
+        default:
+          // Status desconhecido vai para pendentes por segurança
+          categories.pending.push(appointment);
+      }
+    });
+
+    // Ordenar cada categoria por horário
+    Object.keys(categories).forEach(key => {
+      categories[key].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    });
+
+    return categories;
+  }, [appointments]);
+
+  const toggleSection = (sectionKey) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
+  const getCategoryIcon = (category) => {
+    const icons = {
+      pending: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      inProgress: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      completed: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      cancelled: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    };
+    return icons[category];
+  };
+
+  const getCategoryInfo = (category) => {
+    const info = {
+      pending: {
+        title: 'Pendentes',
+        subtitle: 'Aguardando confirmação',
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        borderColor: 'border-amber-200',
+        count: categorizedAppointments.pending.length
+      },
+      inProgress: {
+        title: 'Em Andamento',
+        subtitle: 'Confirmados e em atendimento',
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200',
+        count: categorizedAppointments.inProgress.length
+      },
+      completed: {
+        title: 'Concluídos',
+        subtitle: 'Atendimentos finalizados',
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
+        count: categorizedAppointments.completed.length
+      },
+      cancelled: {
+        title: 'Cancelados/Faltas',
+        subtitle: 'Cancelados ou não compareceram',
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+        count: categorizedAppointments.cancelled.length
+      }
+    };
+    return info[category];
+  };
+
+  const categories = ['pending', 'inProgress', 'completed', 'cancelled'];
+
+  return (
+    <div className="h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-secondary-300 scrollbar-track-secondary-100">
+      <div className="space-y-3">
+        {categories.map(categoryKey => {
+          const categoryInfo = getCategoryInfo(categoryKey);
+          const appointments = categorizedAppointments[categoryKey];
+          const isExpanded = expandedSections[categoryKey];
+
+          // Não mostrar categoria se não houver agendamentos
+          if (appointments.length === 0) return null;
+
+          return (
+            <div key={categoryKey} className={`border rounded-lg ${categoryInfo.borderColor} ${categoryInfo.bgColor}`}>
+              {/* Header da categoria - clicável para expandir/colapsar */}
+              <button
+                onClick={() => toggleSection(categoryKey)}
+                className={`w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-80 transition-colors rounded-lg ${categoryInfo.bgColor}`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={categoryInfo.color}>
+                    {getCategoryIcon(categoryKey)}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className={`font-semibold text-sm ${categoryInfo.color}`}>
+                      {categoryInfo.title}
+                    </h3>
+                    <Badge variant="secondary" size="sm">
+                      {categoryInfo.count}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`text-xs ${categoryInfo.color} opacity-75`}>
+                    {categoryInfo.subtitle}
+                  </span>
+                  <svg 
+                    className={`w-4 h-4 transition-transform duration-200 ${categoryInfo.color} ${isExpanded ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+
+              {/* Conteúdo da categoria - colapsável */}
+              {isExpanded && (
+                <div className="px-4 pb-4">
+                  <div className="space-y-3">
+                    {appointments.map(appointment => (
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        getServiceForAppointment={getServiceForAppointment}
+                        onStatusChange={onStatusChange}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
