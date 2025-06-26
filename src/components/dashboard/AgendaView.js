@@ -849,6 +849,23 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       );
     }
     
+    // Botão de Reagendar
+    if (allowedTransitions.includes(AppointmentStatus.RESCHEDULED)) {
+      buttons.push(
+        <button
+          key="reschedule"
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.RESCHEDULED)}
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors font-medium"
+          title="Reagendar agendamento"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Reagendar
+        </button>
+      );
+    }
+    
     return buttons;
   };
 
@@ -875,9 +892,6 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
               <h3 className="font-bold text-gray-900 text-sm truncate">
                 {formatCustomerName(appointment.customer_name)}
               </h3>
-              <Badge variant={getStatusColor(appointment.status)} size="sm">
-                {getStatusLabel(appointment.status)}
-              </Badge>
             </div>
             
             {/* Horário */}
