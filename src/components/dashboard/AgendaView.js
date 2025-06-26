@@ -5,6 +5,10 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAppointmentsByEstablishment, updateAppointmentStatus } from '../../services/appointmentService';
 import { getServicesByEstablishment } from '../../services/serviceService';
+import { validateStatusTransition, getAllowedTransitions, AppointmentStatus, STATUS_LABELS, STATUS_COLORS, STATUS_CLASSES } from '../../services/statusValidationService';
+import { useToast } from '../common/Toast';
+import ConfirmationModal from '../common/ConfirmationModal';
+import CancellationModal from '../common/CancellationModal';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
@@ -36,10 +40,26 @@ const AgendaView = () => {
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');const [view, setView] = useState('month'); // 'week', 'month', 'year'
+  const [error, setError] = useState('');
+  const [view, setView] = useState('month'); // 'week', 'month', 'year'
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [dayViewType, setDayViewType] = useState('cards'); // 'cards' ou 'timeline'
+  const [dayViewType, setDayViewType] = useState('cards'); // 'cards' ou 'timeline'  // Estado para o modal de confirmação
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmButtonText: 'Confirmar',
+    confirmButtonColor: 'blue',
+    onConfirm: () => {}
+  });
+  
+  // Estado para o modal de cancelamento
+  const [cancelModal, setCancelModal] = useState({
+    isOpen: false,
+    appointmentId: null
+  });// Hook para exibir toast notifications
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
   // Buscar agendamentos e serviços
   useEffect(() => {
     if (currentUser?.establishment?.id) {
@@ -175,16 +195,66 @@ const AgendaView = () => {
     if (count >= r4) return 'bg-primary-600 text-white font-bold';
     return 'bg-primary-50 text-primary-700';
   };const handleStatusChange = async (appointmentId, newStatus) => {
+    // Tratamento especial para o botão de cancelamento unificado
+    if (newStatus === "SHOW_CANCEL_MODAL") {
+      setCancelModal({
+        isOpen: true,
+        appointmentId: appointmentId
+      });
+      return;
+    }
+    
+    // Encontrar o agendamento atual
+    const appointment = appointments.find(appt => appt.id === appointmentId);
+    if (!appointment) {
+      showError('Agendamento não encontrado');
+      return;
+    }
+    
+    // Validar a transição de status
+    const validation = validateStatusTransition(appointment, newStatus);
+    if (!validation.valid) {
+      // Se a transição for inválida, mostrar mensagem de erro
+      showError(validation.message);
+      return;
+    }
+    
+    if (validation.type === 'warning') {
+      // Se precisar de confirmação, mostrar modal
+      setConfirmModal({
+        isOpen: true,
+        title: 'Confirmar alteração de status',
+        message: validation.message,
+        confirmButtonText: 'Sim, continuar',
+        confirmButtonColor: newStatus.includes('cancel') ? 'red' : 
+                            newStatus === AppointmentStatus.NO_SHOW ? 'yellow' : 'blue',
+        onConfirm: () => performStatusChange(appointmentId, newStatus)
+      });
+      return;
+    }
+    
+    // Se não precisar de confirmação, realizar a mudança diretamente
+    performStatusChange(appointmentId, newStatus);
+  };
+  
+  // Função para efetivamente realizar a mudança de status
+  const performStatusChange = async (appointmentId, newStatus) => {
     try {
       const updatedAppointment = await updateAppointmentStatus(appointmentId, newStatus);
       setAppointments(prev => 
         prev.map(appt => (appt.id === appointmentId ? updatedAppointment : appt))
       );
+        // Mostrar toast de sucesso
+      const statusLabel = STATUS_LABELS[newStatus] || newStatus;
+      showSuccess(`Status alterado para: ${statusLabel}`);
     } catch (error) {
-      alert('Falha ao atualizar o status.');
-      console.error(error);
+      // Tratar erro da API
+      const errorMessage = error?.response?.data?.detail || 'Falha ao atualizar o status.';
+      showError(errorMessage);      console.error(error);
     }
-  };// Navegação de datas
+  };
+  
+  // Navegação de datas
   const navigateDate = (direction) => {
     if (view === 'month') {
       setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
@@ -229,9 +299,20 @@ const AgendaView = () => {
       </Card>
     );
   }
+  // Função para tratar a seleção do tipo de cancelamento
+  const handleCancelationChoice = (cancelStatus) => {
+    performStatusChange(cancelModal.appointmentId, cancelStatus);
+  };
 
   return (
-    <div className="space-y-6">      {/* Métricas de Overview */}
+    <div className="space-y-6">
+      {/* Modal de cancelamento (para escolher entre os tipos) */}
+      <CancellationModal
+        isOpen={cancelModal.isOpen}
+        onClose={() => setCancelModal({ ...cancelModal, isOpen: false })}
+        onConfirm={handleCancelationChoice}
+        appointment={appointments.find(appt => appt.id === cancelModal.appointmentId)}
+      />{/* Métricas de Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card padding="sm" className="agenda-metric-card metric-today">
           <div className="flex items-center">
@@ -459,10 +540,20 @@ const AgendaView = () => {
                   />
                 )
               )}
-            </div>
-          </Card>
+            </div>          </Card>
         </div>
       </div>
+      
+      {/* Modal de confirmação para alterações de status */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        confirmButtonColor={confirmModal.confirmButtonColor}
+      />
     </div>
   );
 };
@@ -622,49 +713,33 @@ const WeekView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
 
 // Componente de Card de Agendamento
 const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment, detailed = false }) => {
-  const service = getServiceForAppointment ? getServiceForAppointment(appointment) : appointment.service;  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'warning',
-      confirmed: 'info',
-      completed: 'success',
-      cancelled_by_establishment: 'error',
-      cancelled_by_client: 'error',
-      no_show: 'error'
-    };
-    return colors[status] || 'secondary';
+  const service = getServiceForAppointment ? getServiceForAppointment(appointment) : appointment.service;
+  
+  const getStatusColor = (status) => {
+    return STATUS_COLORS[status] || 'secondary';
   };
 
   const getStatusLabel = (status) => {
-    const labels = {
-      pending: 'Pendente',
-      confirmed: 'Confirmado',
-      completed: 'Concluído',
-      cancelled_by_establishment: 'Cancelado',
-      cancelled_by_client: 'Cancelado pelo Cliente',
-      no_show: 'Não Compareceu'
-    };
-    return labels[status] || status;
-  };  const getStatusClass = (status) => {
-    const classes = {
-      pending: 'agenda-status-pending',
-      confirmed: 'agenda-status-confirmed',
-      completed: 'agenda-status-completed',
-      cancelled_by_establishment: 'agenda-status-cancelled',
-      cancelled_by_client: 'agenda-status-cancelled',
-      no_show: 'agenda-status-no-show'
-    };
-    return classes[status] || '';
+    return STATUS_LABELS[status] || status;
+  };
+  
+  const getStatusClass = (status) => {
+    return STATUS_CLASSES[status] || '';
   };
 
   // Botões de ação baseados no status atual
   const getActionButtons = () => {
     const buttons = [];
     
-    if (appointment.status === 'pending') {
+    // Obter os status permitidos para este agendamento
+    const allowedTransitions = getAllowedTransitions(appointment);
+    
+    // Botão de Confirmar
+    if (allowedTransitions.includes(AppointmentStatus.CONFIRMED)) {
       buttons.push(
         <button
           key="confirm"
-          onClick={() => onStatusChange(appointment.id, 'confirmed')}
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.CONFIRMED)}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium"
           title="Confirmar agendamento"
         >
@@ -676,11 +751,30 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       );
     }
     
-    if (appointment.status === 'confirmed') {
+    // Botão de Iniciar Atendimento
+    if (allowedTransitions.includes(AppointmentStatus.IN_PROGRESS)) {
+      buttons.push(
+        <button
+          key="in_progress"
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.IN_PROGRESS)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors font-medium"
+          title="Iniciar atendimento"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Iniciar
+        </button>
+      );
+    }
+    
+    // Botão de Concluir
+    if (allowedTransitions.includes(AppointmentStatus.COMPLETED)) {
       buttons.push(
         <button
           key="complete"
-          onClick={() => onStatusChange(appointment.id, 'completed')}
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.COMPLETED)}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
           title="Marcar como concluído"
         >
@@ -689,10 +783,15 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
           </svg>
           Concluir
         </button>
-      );      buttons.push(
+      );
+    }
+    
+    // Botão de Não Compareceu
+    if (allowedTransitions.includes(AppointmentStatus.NO_SHOW)) {
+      buttons.push(
         <button
           key="no_show"
-          onClick={() => onStatusChange(appointment.id, 'no_show')}
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.NO_SHOW)}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
           title="Cliente não compareceu"
         >
@@ -703,11 +802,14 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         </button>
       );
     }
-      if (['pending', 'confirmed'].includes(appointment.status)) {
+    
+  // Botão unificado de Cancelamento
+    if (allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+        allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) {
       buttons.push(
         <button
           key="cancel"
-          onClick={() => onStatusChange(appointment.id, 'cancelled_by_establishment')}
+          onClick={() => onStatusChange(appointment.id, "SHOW_CANCEL_MODAL")}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium"
           title="Cancelar agendamento"
         >
@@ -719,12 +821,31 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       );
     }
     
-    return buttons;  };
+    // Botão de Reagendar
+    if (allowedTransitions.includes(AppointmentStatus.RESCHEDULED)) {
+      buttons.push(
+        <button
+          key="reschedule"
+          onClick={() => onStatusChange(appointment.id, AppointmentStatus.RESCHEDULED)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors font-medium"
+          title="Reagendar"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Reagendar
+        </button>
+      );
+    }
+    
+    return buttons;
+  };
 
   return (
     <div className={`border rounded-lg p-3 agenda-appointment-card agenda-fade-in ${getStatusClass(appointment.status)} ${
       detailed ? 'bg-white' : 'bg-secondary-50'
-    }`}>      <div className="flex items-start justify-between mb-2">
+    }`}>
+      <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
             <span className="font-medium text-secondary-900 truncate">
@@ -733,7 +854,8 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
             <Badge variant={getStatusColor(appointment.status)} size="sm">
               {getStatusLabel(appointment.status)}
             </Badge>
-          </div><div className="text-sm text-secondary-600">
+          </div>
+          <div className="text-sm text-secondary-600">
             <div className="flex items-center space-x-4">
               <span className="flex items-center">
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -778,55 +900,97 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         </div>
       </div>
 
-      {/* Botões de Ação Rápida */}
-      {!detailed && getActionButtons().length > 0 && (
+      {/* Botões de Ação Rápida */}      {!detailed && getActionButtons().length > 0 && (
         <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-secondary-200">
           {getActionButtons()}
         </div>
       )}
-
-      {detailed && appointment.status === 'pending' && (
-        <div className="flex space-x-2 mt-3 pt-3 border-t border-secondary-200">
-          <Button
-            size="sm"
-            variant="success"
-            onClick={() => onStatusChange(appointment.id, 'confirmed')}
-            className="flex-1"
-          >
-            Confirmar
-          </Button>
-          <Button
-            size="sm"
-            variant="error"
-            onClick={() => onStatusChange(appointment.id, 'cancelled_by_establishment')}
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
+      
+      {/* Botões detalhados baseados em transições permitidas */}
+      {detailed && (
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-secondary-200">
+          {(() => {
+            // Obter as transições permitidas para este agendamento
+            const allowedTransitions = getAllowedTransitions(appointment);
+            
+            // Mapear botões para transições permitidas
+            const buttonMap = {
+              [AppointmentStatus.CONFIRMED]: {
+                label: "Confirmar",
+                variant: "success"
+              },
+              [AppointmentStatus.IN_PROGRESS]: {
+                label: "Iniciar Atendimento",
+                variant: "info"
+              },
+              [AppointmentStatus.COMPLETED]: {
+                label: "Concluir",
+                variant: "success"
+              },              "CANCEL_UNIFIED": {
+                label: "Cancelar",
+                variant: "error",
+                specialAction: "SHOW_CANCEL_MODAL"
+              },
+              [AppointmentStatus.NO_SHOW]: {
+                label: "Não Compareceu",
+                variant: "outline"
+              },
+              [AppointmentStatus.RESCHEDULED]: {
+                label: "Reagendar",
+                variant: "secondary"
+              }
+            };
+              // Verificamos se alguma das opções de cancelamento está disponível
+            const canCancel = allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+                             allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT);
+            
+            // Filtramos as transições, removendo os cancelamentos individuais
+            const filteredTransitions = allowedTransitions.filter(status => 
+              status !== AppointmentStatus.CANCELLED_BY_ESTABLISHMENT && 
+              status !== AppointmentStatus.CANCELLED_BY_CLIENT
+            );
+            
+            // Se pode cancelar, adicionamos o botão unificado
+            const buttonsToRender = canCancel 
+              ? [...filteredTransitions, "CANCEL_UNIFIED"] 
+              : filteredTransitions;
+            
+            return buttonsToRender.map(status => {
+              const button = buttonMap[status];
+              if (!button) return null;
+              
+              // Verifique se é o botão unificado de cancelamento
+              if (button.specialAction) {
+                return (
+                  <Button
+                    key={status}
+                    size="sm"
+                    variant={button.variant}
+                    onClick={() => onStatusChange(appointment.id, button.specialAction)}
+                    className="flex-1"
+                  >
+                    {button.label}
+                  </Button>
+                );
+              }
+              
+              return (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant={button.variant}
+                  onClick={() => onStatusChange(appointment.id, status)}
+                  className="flex-1"
+                >
+                  {button.label}
+                </Button>
+              );
+            });
+          })()}
         </div>
       )}
-
-      {detailed && appointment.status === 'confirmed' && (
-        <div className="flex space-x-2 mt-3 pt-3 border-t border-secondary-200">
-          <Button
-            size="sm"
-            variant="success"
-            onClick={() => onStatusChange(appointment.id, 'completed')}
-            className="flex-1"
-          >
-            Concluir
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onStatusChange(appointment.id, 'no_show')}
-            className="flex-1"
-          >
-            Não Compareceu
-          </Button>
-        </div>
-      )}
-    </div>  );
+    </div>
+  );
 };
 
 // Componente de Visualização Anual
@@ -1035,42 +1199,59 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
     return grouped;
   }, [appointments]);  const getStatusColor = (status) => {
     const colors = {
-      pending: 'bg-gray-50 border-l-2 border-l-amber-200 border border-gray-200 shadow-sm text-slate-600',
-      confirmed: 'bg-gray-50 border-l-2 border-l-blue-200 border border-gray-200 shadow-sm text-slate-600',
-      completed: 'bg-gray-50 border-l-2 border-l-green-200 border border-gray-200 shadow-sm text-slate-600',
-      cancelled_by_establishment: 'bg-gray-50 border-l-2 border-l-red-200 border border-gray-200 shadow-sm text-slate-600',
-      cancelled_by_client: 'bg-gray-50 border-l-2 border-l-red-200 border border-gray-200 shadow-sm text-slate-600',
-      no_show: 'bg-gray-50 border-l-2 border-l-gray-300 border border-gray-200 shadow-sm text-slate-600'
+      [AppointmentStatus.PENDING]: 'bg-gray-50 border-l-2 border-l-amber-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.CONFIRMED]: 'bg-gray-50 border-l-2 border-l-blue-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.IN_PROGRESS]: 'bg-gray-50 border-l-2 border-l-purple-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.COMPLETED]: 'bg-gray-50 border-l-2 border-l-green-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.CANCELLED_BY_ESTABLISHMENT]: 'bg-gray-50 border-l-2 border-l-red-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.CANCELLED_BY_CLIENT]: 'bg-gray-50 border-l-2 border-l-orange-200 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.NO_SHOW]: 'bg-gray-50 border-l-2 border-l-gray-300 border border-gray-200 shadow-sm text-slate-600',
+      [AppointmentStatus.RESCHEDULED]: 'bg-gray-50 border-l-2 border-l-indigo-200 border border-gray-200 shadow-sm text-slate-600'
     };
     return colors[status] || 'bg-gray-50 border-l-2 border-l-gray-300 border border-gray-200 shadow-sm text-slate-600';
   };const getStatusIcon = (status) => {
-    const icons = {      pending: (
+    const icons = {
+      [AppointmentStatus.PENDING]: (
         <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      confirmed: (
+      [AppointmentStatus.CONFIRMED]: (
         <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ),
-      completed: (
+      [AppointmentStatus.IN_PROGRESS]: (
+        <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      [AppointmentStatus.COMPLETED]: (
         <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-      ),      cancelled_by_establishment: (
+      ),
+      [AppointmentStatus.CANCELLED_BY_ESTABLISHMENT]: (
         <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>      ),
-      cancelled_by_client: (
-        <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        </svg>
+      ),
+      [AppointmentStatus.CANCELLED_BY_CLIENT]: (
+        <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
         </svg>
       ),
-      no_show: (
+      [AppointmentStatus.NO_SHOW]: (
         <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 14l-2-2m0 0l-2-2m2 2l-2 2m2-2l2 2" />
+        </svg>
+      ),
+      [AppointmentStatus.RESCHEDULED]: (
+        <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       )
     };
@@ -1095,26 +1276,25 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                     <span className="italic">Disponível</span>
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {hourAppointments
                       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
                       .map(appointment => {
-                        const service = getServiceForAppointment(appointment);
-                        const startTime = format(parseISO(appointment.start_time), 'HH:mm');
+                        const service = getServiceForAppointment(appointment);                        const startTime = format(parseISO(appointment.start_time), 'HH:mm');
                         const duration = service?.duration_minutes || 30;
-                        const endTime = format(addMinutes(parseISO(appointment.start_time), duration), 'HH:mm');                        // Calcular largura baseada na duração (30min = largura base)
-                        const widthPercentage = Math.min((duration / 60) * 100, 100);
-                          return (                          <div
+                        const endTime = format(addMinutes(parseISO(appointment.start_time), duration), 'HH:mm');
+                        
+                        return (
+                          <div
                             key={appointment.id}
                             className={`
                               timeline-appointment-block timeline-appointment-${appointment.status}
                               rounded-md py-1 cursor-pointer transition-all hover:shadow-md hover:border-l-6
-                              ${getStatusColor(appointment.status)}
+                              ${getStatusColor(appointment.status)} w-full
                             `}
-                            style={{ width: `${Math.max(widthPercentage, 30)}%`, minWidth: '180px' }}
                             title={`${formatCustomerName(appointment.customer_name)} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
-                          >
-                            {/* Conteúdo compacto */}                            <div className="flex items-center justify-between h-6 w-full px-1">
+                          >                            {/* Conteúdo compacto */}
+                            <div className="flex items-center justify-between min-h-7 w-full px-2">
                               <div className="flex items-center space-x-1.5 flex-1 min-w-0">
                                 <div className="flex-shrink-0">
                                   {getStatusIcon(appointment.status)}
@@ -1122,71 +1302,100 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center space-x-2">
                                     <span className="text-xs opacity-75 font-medium">
-                                      {startTime}
+                                      {startTime} - {endTime}
                                     </span>
-                                    <span className="font-medium text-xs truncate max-w-20">
+                                    <span className="font-medium text-xs truncate max-w-28">
                                       {formatCustomerName(appointment.customer_name)}
                                     </span>
                                     {service && (
-                                      <span className="text-xs opacity-60 truncate max-w-16">
+                                      <span className="text-xs opacity-60 truncate max-w-28">
                                         {service.name}
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                              </div>
-                              {/* Botões de ação claramente separados no canto direito */}
+                              </div>                              {/* Botões de ação baseados em transições permitidas */}
                               <div className="flex items-center space-x-0.5 flex-shrink-0">
-                                {appointment.status === 'pending' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onStatusChange(appointment.id, 'confirmed');
-                                    }}
-                                    className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
-                                    title="Confirmar"
-                                  >
-                                    ✓
-                                  </button>
-                                )}
-                                {appointment.status === 'confirmed' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onStatusChange(appointment.id, 'completed');
-                                    }}
-                                    className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
-                                    title="Concluir"
-                                  >
-                                    ✓
-                                  </button>
-                                )}
+                                {/* Obter status permitidos */}
+                                {(() => {
+                                  // Obter transições permitidas
+                                  const allowedTransitions = getAllowedTransitions(appointment);
+                                  return (
+                                    <>
+                                      {/* Botão de Confirmar */}
+                                      {allowedTransitions.includes(AppointmentStatus.CONFIRMED) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, AppointmentStatus.CONFIRMED);
+                                          }}
+                                          className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
+                                          title="Confirmar"
+                                        >
+                                          ✓
+                                        </button>
+                                      )}
+                                      
+                                      {/* Botão de Concluir */}
+                                      {allowedTransitions.includes(AppointmentStatus.COMPLETED) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, AppointmentStatus.COMPLETED);
+                                          }}
+                                          className="w-5 h-5 bg-white text-emerald-400 rounded text-xs hover:bg-emerald-50 flex items-center justify-center font-bold border border-emerald-100 transition-colors"
+                                          title="Concluir"
+                                        >
+                                          ✓
+                                        </button>
+                                      )}
+                                      
+                                      {/* Botão de Iniciar */}
+                                      {allowedTransitions.includes(AppointmentStatus.IN_PROGRESS) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, AppointmentStatus.IN_PROGRESS);
+                                          }}
+                                          className="w-5 h-5 bg-white text-purple-400 rounded text-xs hover:bg-purple-50 flex items-center justify-center font-bold border border-purple-100 transition-colors"
+                                          title="Iniciar Atendimento"
+                                        >
+                                          ▶
+                                        </button>
+                                      )}
 
-                                {appointment.status === 'confirmed' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onStatusChange(appointment.id, 'no_show');
-                                    }}
-                                    className="w-5 h-5 bg-white text-slate-400 rounded text-xs hover:bg-slate-50 flex items-center justify-center font-bold border border-slate-100 transition-colors"
-                                    title="Marcar Falta"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                    </svg>
-                                  </button>
-                                )}                                {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onStatusChange(appointment.id, 'cancelled_by_establishment');
-                                    }}
-                                    className="w-5 h-5 bg-white text-rose-400 rounded text-xs hover:bg-rose-50 flex items-center justify-center font-bold border border-rose-100 transition-colors"
-                                    title="Cancelar"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
+                                      {/* Botão de Não Compareceu */}
+                                      {allowedTransitions.includes(AppointmentStatus.NO_SHOW) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, AppointmentStatus.NO_SHOW);
+                                          }}
+                                          className="w-5 h-5 bg-white text-slate-400 rounded text-xs hover:bg-slate-50 flex items-center justify-center font-bold border border-slate-100 transition-colors"
+                                          title="Marcar Falta"
+                                        >                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20  12H4" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                      
+                                      {/* Botão unificado de cancelamento */}
+                                      {(allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+                                        allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, "SHOW_CANCEL_MODAL");
+                                          }}
+                                          className="w-5 h-5 bg-white text-rose-400 rounded text-xs hover:bg-rose-50 flex items-center justify-center font-bold border border-rose-100 transition-colors"
+                                          title="Cancelar"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
