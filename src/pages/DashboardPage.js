@@ -65,15 +65,14 @@ const DashboardPage = () => {  const { token, logout, isAuthenticated, currentUs
   const [workingHoursError, setWorkingHoursError] = useState('');
   const [isSavingHours, setIsSavingHours] = useState(false);
 
-  // Novo estado para controle da aba ativa
-  const [activeTab, setActiveTab] = useState('overview');
+  // Novo estado para controle da aba ativa - iniciando diretamente em agendamentos
+  const [activeTab, setActiveTab] = useState('schedule');
 
   const tabs = [
-    { id: 'overview', label: 'Visão Geral', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z' },
     { id: 'schedule', label: 'Agendamentos', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
     { id: 'services', label: 'Serviços', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
     { id: 'professionals', label: 'Profissionais', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-    { id: 'settings', label: 'Configurações', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' }
+    { id: 'settings', label: 'Horários', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' }
   ];
 
   useEffect(() => {
@@ -354,167 +353,8 @@ const DashboardPage = () => {  const { token, logout, isAuthenticated, currentUs
         {isAuthenticated ? (
           <div className="space-y-6">
             {/* Tab Content */}
-            {activeTab === 'overview' && (
-              <div className="space-y-8">
-                {/* Quick Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Card padding="md">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mr-4">
-                        <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm text-secondary-600">Agendamentos Hoje</p>
-                        <p className="text-2xl font-bold text-secondary-900">0</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card padding="md">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center mr-4">
-                        <svg className="w-6 h-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm text-secondary-600">Serviços Ativos</p>
-                        <p className="text-2xl font-bold text-secondary-900">{services.length}</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card padding="md">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center mr-4">
-                        <svg className="w-6 h-6 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm text-secondary-600">Próximo Agendamento</p>
-                        <p className="text-lg font-semibold text-secondary-900">--:--</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card padding="md">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-info-100 rounded-lg flex items-center justify-center mr-4">
-                        <svg className="w-6 h-6 text-info-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm text-secondary-600">Faturamento Hoje</p>
-                        <p className="text-lg font-semibold text-secondary-900">R$ 0,00</p>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card>
-                    <h3 className="text-lg font-semibold text-secondary-900 mb-4">Ações Rápidas</h3>
-                    <div className="space-y-3">
-                      <Button 
-                        onClick={() => setActiveTab('services')} 
-                        variant="outline" 
-                        className="w-full justify-start"
-                      >
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Adicionar Novo Serviço
-                      </Button>
-                      <Button 
-                        onClick={() => setActiveTab('professionals')} 
-                        variant="outline" 
-                        className="w-full justify-start"
-                      >
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Gerenciar Profissionais
-                      </Button>
-                      <Button 
-                        onClick={() => setActiveTab('schedule')} 
-                        variant="outline" 
-                        className="w-full justify-start"
-                      >
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Ver Agenda Completa
-                      </Button>
-                      <Button 
-                        onClick={() => setActiveTab('settings')} 
-                        variant="outline" 
-                        className="w-full justify-start"
-                      >
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        </svg>
-                        Configurar Horários
-                      </Button>
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <h3 className="text-lg font-semibold text-secondary-900 mb-4">Agendamentos Recentes</h3>
-                    <div className="space-y-3">
-                      <div className="text-center py-8 text-secondary-500">
-                        <svg className="w-12 h-12 mx-auto mb-3 text-secondary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <p>Nenhum agendamento recente</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <h3 className="text-lg font-semibold text-secondary-900 mb-4">Resumo dos Serviços</h3>
-                    <div className="space-y-3">
-                      {services.length === 0 ? (
-                        <div className="text-center py-8 text-secondary-500">
-                          <svg className="w-12 h-12 mx-auto mb-3 text-secondary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                          </svg>
-                          <p>Nenhum serviço cadastrado</p>
-                        </div>
-                      ) : (
-                        services.slice(0, 3).map(service => (
-                          <div key={service.id} className="flex justify-between items-center py-2 border-b border-secondary-100 last:border-0">
-                            <div>
-                              <p className="text-sm font-medium text-secondary-900">{service.name}</p>
-                              <p className="text-xs text-secondary-500">R$ {service.price.toFixed(2)}</p>
-                            </div>
-                            <Badge variant={service.is_active ? 'success' : 'error'}>
-                              {service.is_active ? 'Ativo' : 'Inativo'}
-                            </Badge>
-                          </div>
-                        ))
-                      )}
-                      {services.length > 3 && (
-                        <Button 
-                          onClick={() => setActiveTab('services')} 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full mt-3"
-                        >
-                          Ver todos os serviços
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                </div>
-              </div>
-            )}
-
-            {/* Services Tab */}
+            
+            {/* Schedule Tab */}
             {activeTab === 'services' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -731,7 +571,7 @@ const DashboardPage = () => {  const { token, logout, isAuthenticated, currentUs
             {activeTab === 'settings' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-secondary-900">Configurações</h2>
+                  <h2 className="text-2xl font-bold text-secondary-900">Horários</h2>
                 </div>
 
                 <Card>
