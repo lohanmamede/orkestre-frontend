@@ -10,6 +10,7 @@ import { useToast } from '../common/Toast';
 import ConfirmationModal from '../common/ConfirmationModal';
 import CancellationModal from '../common/CancellationModal';
 import RescheduleModal from '../common/RescheduleModal';
+import AppointmentDetailsModal from './AppointmentDetailsModal';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
@@ -45,6 +46,12 @@ const AgendaView = () => {
   const [rescheduleModal, setRescheduleModal] = useState({
     isOpen: false,
     appointmentId: null
+  });
+  
+  // Estado para o modal de detalhes do agendamento
+  const [detailsModal, setDetailsModal] = useState({
+    isOpen: false,
+    appointment: null
   });
   
   // Hook para exibir toast notifications
@@ -274,6 +281,14 @@ const AgendaView = () => {
     return appointmentsByDate[dateKey] || [];
   }, [appointmentsByDate, selectedDate]);
 
+  // Função para abrir o modal de detalhes do agendamento
+  const handleAppointmentClick = (appointment) => {
+    setDetailsModal({
+      isOpen: true,
+      appointment: appointment
+    });
+  };
+  
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -352,6 +367,15 @@ const AgendaView = () => {
         onClose={() => setCancelModal({ ...cancelModal, isOpen: false })}
         onConfirm={handleCancelationChoice}
         appointment={appointments.find(appt => appt.id === cancelModal.appointmentId)}
+      />
+      
+      {/* Modal de detalhes do agendamento */}
+      <AppointmentDetailsModal
+        isOpen={detailsModal.isOpen}
+        onClose={() => setDetailsModal({ ...detailsModal, isOpen: false })}
+        appointment={detailsModal.appointment}
+        getServiceForAppointment={getServiceForAppointment}
+        onStatusChange={handleStatusChange}
       />{/* Métricas de Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card padding="sm" className="agenda-metric-card metric-today">
@@ -564,12 +588,14 @@ const AgendaView = () => {
                     appointments={selectedDayAppointments}
                     getServiceForAppointment={getServiceForAppointment}
                     onStatusChange={handleStatusChange}
+                    onAppointmentClick={handleAppointmentClick}
                   />
                 ) : (
                   <TimelineView 
                     appointments={selectedDayAppointments}
                     getServiceForAppointment={getServiceForAppointment}
                     onStatusChange={handleStatusChange}
+                    onAppointmentClick={handleAppointmentClick}
                   />
                 )
               )}
@@ -745,7 +771,7 @@ const WeekView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
 };
 
 // Componente de Card de Agendamento
-const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment, detailed = false }) => {
+const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment, onAppointmentClick, detailed = false }) => {
   const service = getServiceForAppointment ? getServiceForAppointment(appointment) : appointment.service;
   
   const getStatusColor = (status) => {
@@ -910,7 +936,10 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
   };
 
   return (
-    <div className={`group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:border-blue-300 ${getStatusClass(appointment.status)}`}>
+    <div 
+      className={`group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:border-blue-300 cursor-pointer ${getStatusClass(appointment.status)}`}
+      onClick={() => onAppointmentClick && onAppointmentClick(appointment)}
+    >
       {/* Header com cliente e profissional */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -1002,7 +1031,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
 
       {/* Botões de Ação */}
       {getActionButtons().length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
           {getActionButtons()}
         </div>
       )}
@@ -1106,7 +1135,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
 };
 
 // Componente de Visualização Categorizada dos Agendamentos
-const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, onStatusChange }) => {
+const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, onStatusChange, onAppointmentClick }) => {
   const [expandedSections, setExpandedSections] = useState({
     pending: false,
     confirmed: false,
@@ -1320,6 +1349,7 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
                         appointment={appointment}
                         getServiceForAppointment={getServiceForAppointment}
                         onStatusChange={onStatusChange}
+                        onAppointmentClick={onAppointmentClick}
                       />
                     ))}
                   </div>
@@ -1510,7 +1540,7 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
 };
 
 // Componente de Visualização em Timeline
-const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }) => {
+const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, onAppointmentClick }) => {
   // Determinar range de horários baseado nos agendamentos ou usar padrão (8h-20h)
   const getTimeRange = () => {
     if (appointments.length === 0) {
@@ -1634,6 +1664,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
                               ${getStatusColor(appointment.status)} w-full
                             `}
                             title={`${formatCustomerName(appointment.customer_name)} - ${service?.name || 'Serviço'} (${startTime} - ${endTime})`}
+                            onClick={() => onAppointmentClick && onAppointmentClick(appointment)}  // Abrir modal de detalhes ao clicar
                           >                            {/* Conteúdo compacto */}
                             <div className="flex items-center justify-between min-h-7 w-full px-2">
                               <div className="flex items-center space-x-1.5 flex-1 min-w-0">
