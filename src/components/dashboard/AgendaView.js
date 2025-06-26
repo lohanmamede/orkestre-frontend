@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAppointmentsByEstablishment, updateAppointmentStatus } from '../../services/appointmentService';
 import { getServicesByEstablishment } from '../../services/serviceService';
-import { validateStatusTransition, getAllowedTransitions, AppointmentStatus, STATUS_LABELS, STATUS_COLORS, STATUS_CLASSES } from '../../services/statusValidationService';
+import { validateStatusTransition, getAllowedTransitions, getAllowedButtons, AppointmentStatus, STATUS_LABELS, STATUS_COLORS, STATUS_CLASSES } from '../../services/statusValidationService';
 import { useToast } from '../common/Toast';
 import ConfirmationModal from '../common/ConfirmationModal';
 import CancellationModal from '../common/CancellationModal';
@@ -825,11 +825,11 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
   const getActionButtons = () => {
     const buttons = [];
     
-    // Obter os status permitidos para este agendamento
-    const allowedTransitions = getAllowedTransitions(appointment);
+    // Obter os botões permitidos para este agendamento (aplicando regras de conflito)
+    const allowedButtons = getAllowedButtons(appointment);
     
     // Botão de Confirmar
-    if (allowedTransitions.includes(AppointmentStatus.CONFIRMED)) {
+    if (allowedButtons.includes(AppointmentStatus.CONFIRMED)) {
       buttons.push(
         <button
           key="confirm"
@@ -846,7 +846,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     }
     
     // Botão de Iniciar Atendimento
-    if (allowedTransitions.includes(AppointmentStatus.IN_PROGRESS)) {
+    if (allowedButtons.includes(AppointmentStatus.IN_PROGRESS)) {
       buttons.push(
         <button
           key="in_progress"
@@ -864,7 +864,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     }
     
     // Botão de Concluir
-    if (allowedTransitions.includes(AppointmentStatus.COMPLETED)) {
+    if (allowedButtons.includes(AppointmentStatus.COMPLETED)) {
       buttons.push(
         <button
           key="complete"
@@ -881,7 +881,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     }
     
     // Botão de Não Compareceu
-    if (allowedTransitions.includes(AppointmentStatus.NO_SHOW)) {
+    if (allowedButtons.includes(AppointmentStatus.NO_SHOW)) {
       buttons.push(
         <button
           key="no_show"
@@ -898,8 +898,8 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     }
     
     // Botão unificado de Cancelamento
-    if (allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
-        allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) {
+    if (allowedButtons.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+        allowedButtons.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) {
       buttons.push(
         <button
           key="cancel"
@@ -916,7 +916,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     }
     
     // Botão de Reagendar
-    if (allowedTransitions.includes(AppointmentStatus.RESCHEDULED)) {
+    if (allowedButtons.includes(AppointmentStatus.RESCHEDULED)) {
       buttons.push(
         <button
           key="reschedule"
@@ -1040,8 +1040,8 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       {detailed && (
         <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-secondary-200">
           {(() => {
-            // Obter as transições permitidas para este agendamento
-            const allowedTransitions = getAllowedTransitions(appointment);
+            // Obter transições permitidas para este agendamento
+            const allowedButtons = getAllowedButtons(appointment);
             
             // Mapear botões para transições permitidas
             const buttonMap = {
@@ -1074,14 +1074,14 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
             };
 
             // Verificamos se alguma das opções de cancelamento está disponível
-            const canCancel = allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
-                             allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT);
+            const canCancel = allowedButtons.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+                             allowedButtons.includes(AppointmentStatus.CANCELLED_BY_CLIENT);
             
             // Verificamos se o reagendamento está disponível
-            const canReschedule = allowedTransitions.includes(AppointmentStatus.RESCHEDULED);
+            const canReschedule = allowedButtons.includes(AppointmentStatus.RESCHEDULED);
             
             // Filtramos as transições, removendo os cancelamentos individuais e reagendamento
-            const filteredTransitions = allowedTransitions.filter(status => 
+            const filteredTransitions = allowedButtons.filter(status => 
               status !== AppointmentStatus.CANCELLED_BY_ESTABLISHMENT && 
               status !== AppointmentStatus.CANCELLED_BY_CLIENT &&
               status !== AppointmentStatus.RESCHEDULED
@@ -1690,12 +1690,12 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
                               <div className="flex items-center space-x-0.5 flex-shrink-0">
                                 {/* Obter status permitidos */}
                                 {(() => {
-                                  // Obter transições permitidas
-                                  const allowedTransitions = getAllowedTransitions(appointment);
+                                  // Obter botões permitidos
+                                  const allowedButtons = getAllowedButtons(appointment);
                                   return (
                                     <>
                                       {/* Botão de Confirmar */}
-                                      {allowedTransitions.includes(AppointmentStatus.CONFIRMED) && (
+                                      {allowedButtons.includes(AppointmentStatus.CONFIRMED) && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1709,7 +1709,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
                                       )}
                                       
                                       {/* Botão de Concluir */}
-                                      {allowedTransitions.includes(AppointmentStatus.COMPLETED) && (
+                                      {allowedButtons.includes(AppointmentStatus.COMPLETED) && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1723,7 +1723,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
                                       )}
                                       
                                       {/* Botão de Iniciar */}
-                                      {allowedTransitions.includes(AppointmentStatus.IN_PROGRESS) && (
+                                      {allowedButtons.includes(AppointmentStatus.IN_PROGRESS) && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1737,7 +1737,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
                                       )}
 
                                       {/* Botão de Não Compareceu */}
-                                      {allowedTransitions.includes(AppointmentStatus.NO_SHOW) && (
+                                      {allowedButtons.includes(AppointmentStatus.NO_SHOW) && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1751,9 +1751,25 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
                                         </button>
                                       )}
                                       
+                                      {/* Botão de Reagendar */}
+                                      {allowedButtons.includes(AppointmentStatus.RESCHEDULED) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStatusChange(appointment.id, "SHOW_RESCHEDULE_MODAL");
+                                          }}
+                                          className="w-5 h-5 bg-white text-amber-400 rounded text-xs hover:bg-amber-50 flex items-center justify-center font-bold border border-amber-100 transition-colors"
+                                          title="Reagendar"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                      
                                       {/* Botão unificado de cancelamento */}
-                                      {(allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
-                                        allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) && (
+                                      {(allowedButtons.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+                                        allowedButtons.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();

@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
-import { STATUS_LABELS, STATUS_COLORS } from '../../services/statusValidationService';
+import { STATUS_LABELS, STATUS_COLORS, getAllowedButtons, AppointmentStatus } from '../../services/statusValidationService';
 import { formatCustomerName } from '../../utils/formatters';
 
 const AppointmentDetailsModal = ({ 
@@ -298,34 +298,42 @@ const AppointmentDetailsModal = ({
           
           {onStatusChange && (
             <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onStatusChange(appointment.id, "SHOW_RESCHEDULE_MODAL");
-                  onClose();
-                }}
-                className="text-sm"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Reagendar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onStatusChange(appointment.id, "SHOW_CANCEL_MODAL");
-                  onClose();
-                }}
-                className="text-sm text-red-600 border-red-200 hover:bg-red-50"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Cancelar
-              </Button>
+              {/* Verificar se pode reagendar */}
+              {getAllowedButtons(appointment).includes(AppointmentStatus.RESCHEDULED) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onStatusChange(appointment.id, "SHOW_RESCHEDULE_MODAL");
+                    onClose();
+                  }}
+                  className="text-sm"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Reagendar
+                </Button>
+              )}
+              
+              {/* Verificar se pode cancelar */}
+              {(getAllowedButtons(appointment).includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
+                getAllowedButtons(appointment).includes(AppointmentStatus.CANCELLED_BY_CLIENT)) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onStatusChange(appointment.id, "SHOW_CANCEL_MODAL");
+                    onClose();
+                  }}
+                  className="text-sm text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Cancelar
+                </Button>
+              )}
             </div>
           )}
         </div>
