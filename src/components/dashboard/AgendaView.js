@@ -1059,19 +1059,23 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
 // Componente de Visualização Categorizada dos Agendamentos
 const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, onStatusChange }) => {
   const [expandedSections, setExpandedSections] = useState({
-    pending: true,
-    inProgress: true,
-    completed: true,
-    cancelled: false
+    pending: false,
+    confirmed: false,
+    inProgress: false,
+    completed: false,
+    cancelled: false,
+    noShow: false
   });
 
   // Categorizar agendamentos por status
   const categorizedAppointments = useMemo(() => {
     const categories = {
       pending: [],
+      confirmed: [],
       inProgress: [],
       completed: [],
-      cancelled: []
+      cancelled: [],  // Categoria única para todos os tipos de cancelamento
+      noShow: []
     };
 
     appointments.forEach(appointment => {
@@ -1080,17 +1084,23 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
           categories.pending.push(appointment);
           break;
         case AppointmentStatus.CONFIRMED:
+          categories.confirmed.push(appointment);
+          break;
         case AppointmentStatus.IN_PROGRESS:
-        case AppointmentStatus.RESCHEDULED:  // Reagendados ainda serão executados
           categories.inProgress.push(appointment);
+          break;
+        case AppointmentStatus.RESCHEDULED:  // Reagendados ainda serão executados
+          categories.confirmed.push(appointment);
           break;
         case AppointmentStatus.COMPLETED:
           categories.completed.push(appointment);
           break;
         case AppointmentStatus.CANCELLED_BY_CLIENT:
         case AppointmentStatus.CANCELLED_BY_ESTABLISHMENT:
+          categories.cancelled.push(appointment);  // Agora agrupados
+          break;
         case AppointmentStatus.NO_SHOW:
-          categories.cancelled.push(appointment);
+          categories.noShow.push(appointment);
           break;
         default:
           // Status desconhecido vai para pendentes por segurança
@@ -1120,6 +1130,11 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
+      confirmed: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
       inProgress: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1127,12 +1142,17 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
       ),
       completed: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ),
       cancelled: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      noShow: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
         </svg>
       )
     };
@@ -1149,9 +1169,17 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
         borderColor: 'border-amber-200',
         count: categorizedAppointments.pending.length
       },
+      confirmed: {
+        title: 'Confirmados',
+        subtitle: 'Aguardando atendimento',
+        color: 'text-teal-600',
+        bgColor: 'bg-teal-50',
+        borderColor: 'border-teal-200',
+        count: categorizedAppointments.confirmed.length
+      },
       inProgress: {
         title: 'Em Andamento',
-        subtitle: 'Confirmados e em atendimento',
+        subtitle: 'Atendimento em execução',
         color: 'text-blue-600',
         bgColor: 'bg-blue-50',
         borderColor: 'border-blue-200',
@@ -1166,18 +1194,26 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
         count: categorizedAppointments.completed.length
       },
       cancelled: {
-        title: 'Cancelados/Faltas',
-        subtitle: 'Cancelados ou não compareceram',
+        title: 'Cancelados',
+        subtitle: 'Cancelados',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50',
+        borderColor: 'border-red-200',
+        count: categorizedAppointments.cancelled.length
+      },
+      noShow: {
+        title: 'Faltas',
+        subtitle: 'Cliente não compareceu',
         color: 'text-gray-600',
         bgColor: 'bg-gray-50',
         borderColor: 'border-gray-200',
-        count: categorizedAppointments.cancelled.length
+        count: categorizedAppointments.noShow.length
       }
     };
     return info[category];
   };
 
-  const categories = ['pending', 'inProgress', 'completed', 'cancelled'];
+  const categories = ['pending', 'confirmed', 'inProgress', 'completed', 'cancelled', 'noShow'];
 
   return (
     <div className="h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-secondary-300 scrollbar-track-secondary-100">
@@ -1210,7 +1246,7 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
                     </Badge>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 text-right">
                   <span className={`text-xs ${categoryInfo.color} opacity-75`}>
                     {categoryInfo.subtitle}
                   </span>
@@ -1445,6 +1481,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange }
   const appointmentsByHour = useMemo(() => {
     const grouped = {};
     appointments.forEach(appt => {
+
       const hour = new Date(appt.start_time).getHours();
       if (!grouped[hour]) {
         grouped[hour] = [];
