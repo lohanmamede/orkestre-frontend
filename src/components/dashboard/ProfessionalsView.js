@@ -16,6 +16,7 @@ import Alert from '../common/Alert';
 import { LoadingState } from '../common/LoadingStates';
 import ProfessionalForm from './ProfessionalForm';
 import ProfessionalCard from './ProfessionalCard';
+import AddProfessionalCard from './AddProfessionalCard';
 import ProfessionalDetailsModal from './ProfessionalDetailsModal';
 
 const ProfessionalsView = () => {
@@ -375,42 +376,34 @@ const ProfessionalsView = () => {
       )}
 
       {/* Lista de profissionais */}
-      {filteredProfessionals.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProfessionals.map((professional) => (
-            <ProfessionalCard
-              key={professional.id}
-              professional={professional}
-              onEdit={() => openEditModal(professional)}
-              onDelete={() => openDeleteModal(professional)}
-              onToggleStatus={() => handleToggleStatus(professional)}
-              onViewDetails={() => openDetailsModal(professional)}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card className="p-8 text-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Card para adicionar profissional - sempre aparece primeiro */}
+        <AddProfessionalCard onClick={openCreateModal} />
+        
+        {/* Cards dos profissionais existentes */}
+        {filteredProfessionals.map((professional) => (
+          <ProfessionalCard
+            key={professional.id}
+            professional={professional}
+            onEdit={() => openEditModal(professional)}
+            onDelete={() => openDeleteModal(professional)}
+            onToggleStatus={() => handleToggleStatus(professional)}
+            onViewDetails={() => openDetailsModal(professional)}
+          />
+        ))}
+      </div>
+
+      {/* Mensagem quando não há profissionais cadastrados */}
+      {filteredProfessionals.length === 0 && (searchTerm || statusFilter !== 'all') && (
+        <Card className="p-8 text-center mt-6">
           <div className="max-w-md mx-auto">
             <svg className="mx-auto h-12 w-12 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-secondary-900">Nenhum profissional encontrado</h3>
             <p className="mt-1 text-sm text-secondary-500">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Tente ajustar os filtros de busca.' 
-                : 'Comece criando seu primeiro profissional.'
-              }
+              Tente ajustar os filtros de busca.
             </p>
-            {!searchTerm && statusFilter === 'all' && (
-              <div className="mt-6">
-                <Button onClick={openCreateModal} variant="primary">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Criar Primeiro Profissional
-                </Button>
-              </div>
-            )}
           </div>
         </Card>
       )}
