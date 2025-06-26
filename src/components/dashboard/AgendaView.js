@@ -727,6 +727,41 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
     return STATUS_CLASSES[status] || '';
   };
 
+  // Função para gerar cor de avatar baseada no nome
+  const getAvatarColor = (name) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
+      'bg-indigo-500', 'bg-red-500', 'bg-yellow-500', 'bg-teal-500'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Função para obter iniciais do profissional
+  const getProfessionalInitials = (professionalName) => {
+    if (!professionalName) return 'PR';
+    return professionalName
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  // Função para obter iniciais do cliente
+  const getCustomerInitials = (customerName) => {
+    if (!customerName) return 'C';
+    return customerName
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
   // Botões de ação baseados no status atual
   const getActionButtons = () => {
     const buttons = [];
@@ -740,7 +775,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         <button
           key="confirm"
           onClick={() => onStatusChange(appointment.id, AppointmentStatus.CONFIRMED)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium"
           title="Confirmar agendamento"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -757,7 +792,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         <button
           key="in_progress"
           onClick={() => onStatusChange(appointment.id, AppointmentStatus.IN_PROGRESS)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors font-medium"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors font-medium"
           title="Iniciar atendimento"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -775,7 +810,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         <button
           key="complete"
           onClick={() => onStatusChange(appointment.id, AppointmentStatus.COMPLETED)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
           title="Marcar como concluído"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -792,7 +827,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
         <button
           key="no_show"
           onClick={() => onStatusChange(appointment.id, AppointmentStatus.NO_SHOW)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
           title="Cliente não compareceu"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -803,14 +838,14 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       );
     }
     
-  // Botão unificado de Cancelamento
+    // Botão unificado de Cancelamento
     if (allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
         allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT)) {
       buttons.push(
         <button
           key="cancel"
           onClick={() => onStatusChange(appointment.id, "SHOW_CANCEL_MODAL")}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium"
           title="Cancelar agendamento"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -821,92 +856,111 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
       );
     }
     
-    // Botão de Reagendar
-    if (allowedTransitions.includes(AppointmentStatus.RESCHEDULED)) {
-      buttons.push(
-        <button
-          key="reschedule"
-          onClick={() => onStatusChange(appointment.id, AppointmentStatus.RESCHEDULED)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors font-medium"
-          title="Reagendar"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Reagendar
-        </button>
-      );
-    }
-    
     return buttons;
   };
 
   return (
-    <div className={`border rounded-lg p-3 agenda-appointment-card agenda-fade-in ${getStatusClass(appointment.status)} ${
-      detailed ? 'bg-white' : 'bg-secondary-50'
-    }`}>
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="font-medium text-secondary-900 truncate">
-              {formatCustomerName(appointment.customer_name)}
-            </span>
-            <Badge variant={getStatusColor(appointment.status)} size="sm">
-              {getStatusLabel(appointment.status)}
-            </Badge>
+    <div className={`group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:border-blue-300 ${getStatusClass(appointment.status)}`}>
+      {/* Header com cliente e profissional */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
+          {/* Avatar do Cliente */}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${getAvatarColor(appointment.customer_name || 'Cliente')}`}>
+            {appointment.customer_photo ? (
+              <img 
+                src={appointment.customer_photo} 
+                alt={appointment.customer_name}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <span>{getCustomerInitials(appointment.customer_name)}</span>
+            )}
           </div>
-          <div className="text-sm text-secondary-600">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {format(parseISO(appointment.start_time), 'HH:mm')}
-              </span>
-              {detailed && (
-                <span className="flex items-center">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  {appointment.customer_phone}
-                </span>
-              )}
-              {service && (
-                <span className="flex items-center text-secondary-700 font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" />
-                  </svg>
-                  {service.name}
-                </span>
-              )}
-              {service && (
-                <span className="flex items-center text-primary-600 font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  R$ {service.price.toFixed(2)}
-                </span>
-              )}
-              {service && (
-                <span className="flex items-center text-secondary-500">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {service.duration_minutes} min
-                </span>
-              )}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2 mb-1">
+              <h3 className="font-bold text-gray-900 text-sm truncate">
+                {formatCustomerName(appointment.customer_name)}
+              </h3>
+              <Badge variant={getStatusColor(appointment.status)} size="sm">
+                {getStatusLabel(appointment.status)}
+              </Badge>
             </div>
+            
+            {/* Horário */}
+            <div className="flex items-center text-xs text-gray-600">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {format(parseISO(appointment.start_time), 'HH:mm')}
+              {service && <span className="mx-1">•</span>}
+              {service && <span>{service.duration_minutes} min</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Avatar do Profissional (sempre mostrar) */}
+        <div className="flex items-center space-x-2">
+          <div className="text-right">
+            <p className="text-xs text-gray-600 font-medium">
+              {appointment.professional_name || 'Profissional'}
+            </p>
+            <p className="text-xs text-gray-500">Responsável</p>
+          </div>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ${getAvatarColor(appointment.professional_name || 'Profissional')}`}>
+            {appointment.professional_photo ? (
+              <img 
+                src={appointment.professional_photo} 
+                alt={appointment.professional_name || 'Profissional'}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : appointment.professional_name ? (
+              <span>{getProfessionalInitials(appointment.professional_name)}</span>
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Botões de Ação Rápida */}      {!detailed && getActionButtons().length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-secondary-200">
+      {/* Serviço e Preço */}
+      {service && (
+        <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" />
+            </svg>
+            <span className="text-sm font-medium text-gray-700">{service.name}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            <span className="text-sm font-bold text-green-600">R$ {service.price.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Contato do cliente (só em modo detalhado) */}
+      {detailed && appointment.customer_phone && (
+        <div className="flex items-center space-x-2 mb-3 text-xs text-gray-600">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+          <span>{appointment.customer_phone}</span>
+        </div>
+      )}
+
+      {/* Botões de Ação */}
+      {getActionButtons().length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
           {getActionButtons()}
         </div>
       )}
       
-      {/* Botões detalhados baseados em transições permitidas */}
+      {/* Botões detalhados para modo detailed */}
       {detailed && (
         <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-secondary-200">
           {(() => {
@@ -926,7 +980,8 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
               [AppointmentStatus.COMPLETED]: {
                 label: "Concluir",
                 variant: "success"
-              },              "CANCEL_UNIFIED": {
+              },
+              "CANCEL_UNIFIED": {
                 label: "Cancelar",
                 variant: "error",
                 specialAction: "SHOW_CANCEL_MODAL"
@@ -940,7 +995,8 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
                 variant: "secondary"
               }
             };
-              // Verificamos se alguma das opções de cancelamento está disponível
+
+            // Verificamos se alguma das opções de cancelamento está disponível
             const canCancel = allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) || 
                              allowedTransitions.includes(AppointmentStatus.CANCELLED_BY_CLIENT);
             
