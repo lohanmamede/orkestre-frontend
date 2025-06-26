@@ -30,19 +30,28 @@ export const BLOCKED_TRANSITIONS = {
     AppointmentStatus.RESCHEDULED
   ],
   [AppointmentStatus.CANCELLED_BY_CLIENT]: [
+    AppointmentStatus.PENDING,
+    AppointmentStatus.CONFIRMED,
+    AppointmentStatus.IN_PROGRESS,
     AppointmentStatus.COMPLETED,
     AppointmentStatus.NO_SHOW,
-    AppointmentStatus.IN_PROGRESS
+    AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
   ],
   [AppointmentStatus.CANCELLED_BY_ESTABLISHMENT]: [
+    AppointmentStatus.PENDING,
+    AppointmentStatus.CONFIRMED,
+    AppointmentStatus.IN_PROGRESS,
     AppointmentStatus.COMPLETED,
     AppointmentStatus.NO_SHOW,
-    AppointmentStatus.IN_PROGRESS
+    AppointmentStatus.CANCELLED_BY_CLIENT
   ],
   [AppointmentStatus.NO_SHOW]: [
-    AppointmentStatus.CONFIRMED,
     AppointmentStatus.PENDING,
-    AppointmentStatus.COMPLETED
+    AppointmentStatus.CONFIRMED,
+    AppointmentStatus.IN_PROGRESS,
+    AppointmentStatus.COMPLETED,
+    AppointmentStatus.CANCELLED_BY_CLIENT,
+    AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
   ]
 };
 
