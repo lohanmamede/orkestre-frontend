@@ -4,7 +4,12 @@ import './App.css';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import ReportsPage from './pages/ReportsPage';
+import ClientsPage from './pages/ClientsPage';
+import MarketingPage from './pages/MarketingPage';
+import ConfigPage from './pages/ConfigPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import DashboardLayout from './components/layout/DashboardLayout';
 import BookingPage from './pages/BookingPage';
 import Container from './components/common/Container';
 import Button from './components/common/Button';
@@ -186,9 +191,15 @@ function App() {
           <Route path="/cadastro" element={<RegisterPage />} />
           <Route path="/agendar/:establishmentId" element={<BookingPage />} /> {/* <<<--- NOVA ROTA PÚBLICA */}
 
-          {/* Rota Protegida para o Dashboard */}
+          {/* Rotas Protegidas */}
           <Route element={<ProtectedRoute />}> {/* Envolve as rotas que você quer proteger */}
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/marketing" element={<MarketingPage />} />
+              <Route path="/config" element={<ConfigPage />} />
+            </Route>
             {/* Você pode adicionar outras rotas protegidas aqui dentro no futuro */}
           </Route>
 
@@ -198,6 +209,5 @@ function App() {
     </Router>
   );
 }
-
 
 export default App;
