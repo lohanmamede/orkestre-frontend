@@ -191,6 +191,18 @@ const AgendaView = () => {
     if (count >= r4) return 'bg-primary-600 text-white font-bold';
     return 'bg-primary-50 text-primary-700';
   };
+
+  // Função para obter o texto de contexto temporal
+  const getDateContextText = (date) => {
+    const today = new Date();
+    const tomorrow = addDays(today, 1);
+    const yesterday = addDays(today, -1);
+    
+    if (isSameDay(date, today)) return 'hoje';
+    if (isSameDay(date, tomorrow)) return 'amanhã';
+    if (isSameDay(date, yesterday)) return 'ontem';
+    return '';
+  };
   
   const handleStatusChange = async (appointmentId, newStatus) => {
     // Tratamento especial para o botão de cancelamento unificado
@@ -376,78 +388,7 @@ const AgendaView = () => {
         appointment={detailsModal.appointment}
         getServiceForAppointment={getServiceForAppointment}
         onStatusChange={handleStatusChange}
-      />{/* Métricas de Overview */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card padding="sm" className="agenda-metric-card metric-today">
-          <div className="flex items-center">
-            <div className="w-8 h-8 mr-3 text-primary-600 flex-shrink-0">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-secondary-900">{metrics.today}</p>
-              <p className="text-xs text-secondary-600">Hoje</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="sm" className="agenda-metric-card metric-confirmed">
-          <div className="flex items-center">
-            <div className="w-8 h-8 mr-3 text-success-600 flex-shrink-0">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-secondary-900">{metrics.confirmedToday}</p>
-              <p className="text-xs text-secondary-600">Confirmados</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="sm" className="agenda-metric-card metric-pending">
-          <div className="flex items-center">
-            <div className="w-8 h-8 mr-3 text-warning-600 flex-shrink-0">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-secondary-900">{metrics.pending}</p>
-              <p className="text-xs text-secondary-600">Pendentes</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="sm" className="agenda-metric-card metric-week">
-          <div className="flex items-center">
-            <div className="w-8 h-8 mr-3 text-info-600 flex-shrink-0">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-secondary-900">{metrics.thisWeek}</p>
-              <p className="text-xs text-secondary-600">Esta Semana</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="sm" className="agenda-metric-card metric-revenue">
-          <div className="flex items-center">
-            <div className="w-8 h-8 mr-3 text-success-600 flex-shrink-0">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-secondary-900">R$ {metrics.totalRevenue.toFixed(0)}</p>
-              <p className="text-xs text-secondary-600">Faturado</p>
-            </div>
-          </div>
-        </Card>
-      </div>      {/* Controles de Visualização */}
+      />{/* Controles de Visualização */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-2">
           <Button
@@ -532,6 +473,8 @@ const AgendaView = () => {
                 appointmentsByDate={appointmentsByDate}
                 selectedDate={selectedDate}
                 setSelectedDate={setSelectedDate}
+                setCurrentDate={setCurrentDate}
+                setView={setView}
               />}
             </div>
           </Card>
@@ -541,6 +484,11 @@ const AgendaView = () => {
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h4 className="font-semibold text-secondary-900">
                 {format(selectedDate, 'dd \'de\' MMMM', { locale: ptBR })}
+                {getDateContextText(selectedDate) && (
+                  <span className="ml-2 text-sm text-primary-600 font-medium">
+                    ({getDateContextText(selectedDate)})
+                  </span>
+                )}
               </h4>              <div className="flex items-center space-x-3">
                 <div className="view-toggle-container flex items-center space-x-1 p-1">
                   <Button 
@@ -660,21 +608,6 @@ const MonthView = ({ currentDate, appointmentsByDate, getDateIntensity, selected
               `}
             >
               <span className="relative z-10">{format(day, 'd')}</span>
-              {dayAppointments.length > 0 && (
-                <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2">
-                  <div className="flex space-x-0.5">
-                    {dayAppointments.slice(0, 3).map((_, index) => (
-                      <div
-                        key={index}
-                        className="w-1 h-1 rounded-full bg-current opacity-70"
-                      />
-                    ))}
-                    {dayAppointments.length > 3 && (
-                      <div className="text-xs">+</div>
-                    )}
-                  </div>
-                </div>
-              )}
             </button>
           );
         })}
@@ -890,7 +823,7 @@ const AppointmentCard = ({ appointment, onStatusChange, getServiceForAppointment
           title="Cliente não compareceu"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20  12H4" />
           </svg>
           Faltou
         </button>
@@ -1364,7 +1297,7 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
 };
 
 // Componente de Visualização Anual
-const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDate }) => {
+const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDate, setCurrentDate, setView }) => {
   const currentYear = currentDate.getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
   // Calcular ranges dinâmicos para meses do ano
@@ -1453,7 +1386,11 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
           return (
             <button
               key={month.toISOString()}
-              onClick={() => setSelectedDate(month)}
+              onClick={() => {
+                setCurrentDate(month);
+                setSelectedDate(month);
+                setView('month');
+              }}
               className={`
                 relative p-4 rounded-lg text-center transition-all hover:scale-105
                 ${isSelectedMonth ? 'ring-2 ring-primary-500' : ''}
@@ -1467,38 +1404,6 @@ const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDa
               <div className="text-xs opacity-75">
                 {appointmentCount} ag.
               </div>
-              
-              {/* Indicador visual de atividade dinâmico */}
-              {appointmentCount > 0 && (
-                <div className="absolute top-2 right-2">
-                  <div className="flex space-x-0.5">
-                    {appointmentCount >= r1 && appointmentCount < r2 && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                    )}
-                    {appointmentCount >= r2 && appointmentCount < r3 && (
-                      <>
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                      </>
-                    )}
-                    {appointmentCount >= r3 && appointmentCount < r4 && (
-                      <>
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                      </>
-                    )}
-                    {appointmentCount >= r4 && (
-                      <>
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
             </button>
           );
         })}
@@ -1610,7 +1515,7 @@ const TimelineView = ({ appointments, getServiceForAppointment, onStatusChange, 
       ),
       [AppointmentStatus.CANCELLED_BY_CLIENT]: (
         <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4  0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
         </svg>
       ),
