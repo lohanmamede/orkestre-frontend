@@ -159,4 +159,49 @@ describe('StatusValidationService - Temporal Rules', () => {
 
   });
 
+  describe('Situações Anômalas', () => {
+    
+    test('IN_PROGRESS futuro (situação anômala) - deve permitir apenas cancelamentos', () => {
+      // Agendamento IN_PROGRESS no futuro (situação anômala)
+      const futureDate = new Date();
+      futureDate.setHours(futureDate.getHours() + 2);
+      
+      const appointment = {
+        status: AppointmentStatus.IN_PROGRESS,
+        start_time: futureDate.toISOString()
+      };
+      
+      const { getAllowedButtons, getAllowedTransitions } = require('./statusValidationService');
+      const buttons = getAllowedButtons(appointment);
+      const transitions = getAllowedTransitions(appointment);
+      
+      // Deve permitir apenas cancelamentos
+      expect(buttons).toEqual(expect.arrayContaining([
+        AppointmentStatus.CANCELLED_BY_CLIENT,
+        AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
+      ]));
+      
+      // NÃO deve permitir confirmar (pois já está em progresso)
+      expect(buttons).not.toContain(AppointmentStatus.CONFIRMED);
+      
+      // NÃO deve permitir concluir (pois ainda não é hora)
+      expect(buttons).not.toContain(AppointmentStatus.COMPLETED);
+      
+      // Deve ter apenas 2 opções
+      expect(buttons).toHaveLength(2);
+      
+      // Validar transições também
+      expect(transitions).toEqual(expect.arrayContaining([
+        AppointmentStatus.CANCELLED_BY_CLIENT,
+        AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
+      ]));
+      expect(transitions).not.toContain(AppointmentStatus.CONFIRMED);
+      expect(transitions).not.toContain(AppointmentStatus.COMPLETED);
+      expect(transitions).toHaveLength(2);
+      
+      console.log('✅ IN_PROGRESS futuro só permite cancelamentos:', buttons);
+    });
+
+  });
+
 });

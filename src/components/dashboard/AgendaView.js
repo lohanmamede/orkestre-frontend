@@ -388,72 +388,114 @@ const AgendaView = () => {
         appointment={detailsModal.appointment}
         getServiceForAppointment={getServiceForAppointment}
         onStatusChange={handleStatusChange}
-      />{/* Controles de Visualização */}
+      />      {/* Controles de Visualização */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant={view === 'week' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setView('week')}
-          >
-            Semana
-          </Button>
-          <Button
-            variant={view === 'month' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setView('month')}
-          >
-            Mês
-          </Button>
-          <Button
-            variant={view === 'year' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setView('year')}
-          >
-            Ano
-          </Button>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigateDate('prev')}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Button>          <h3 className="text-lg font-semibold text-secondary-900 min-w-0">
-            {view === 'month' && format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-            {view === 'week' && `${format(startOfWeek(currentDate, { locale: ptBR }), 'dd MMM', { locale: ptBR })} - ${format(endOfWeek(currentDate, { locale: ptBR }), 'dd MMM yyyy', { locale: ptBR })}`}
-            {view === 'year' && format(currentDate, 'yyyy', { locale: ptBR })}
-          </h3>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigateDate('next')}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setCurrentDate(new Date());
-              setSelectedDate(new Date());
-            }}
-          >
-            Hoje
-          </Button>
-        </div>
-      </div>      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Área que ficará vazia agora - os controles foram movidos para dentro do calendário */}
+      </div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Calendário */}
         <div className="h-full">
           <Card padding="md" className="h-full flex flex-col">
+            {/* Controles Integrados - Layout reorganizado */}
+            <div className="mb-3 space-y-2">
+              {/* Primeira linha: Botões de Visualização (esquerda) + Botão Hoje (direita) */}
+              <div className="flex items-center justify-between">
+                {/* Botões de Visualização - Alinhados à esquerda */}
+                <div className="inline-flex rounded-md bg-secondary-100 p-0.5">
+                  <button
+                    onClick={() => setView('week')}
+                    className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                      view === 'week' 
+                        ? 'bg-white shadow-sm text-primary-600' 
+                        : 'text-secondary-600 hover:text-secondary-800'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Sem</span>
+                    <span className="sm:hidden">S</span>
+                  </button>
+                  <button
+                    onClick={() => setView('month')}
+                    className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                      view === 'month' 
+                        ? 'bg-white shadow-sm text-primary-600' 
+                        : 'text-secondary-600 hover:text-secondary-800'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Mês</span>
+                    <span className="sm:hidden">M</span>
+                  </button>
+                  <button
+                    onClick={() => setView('year')}
+                    className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                      view === 'year' 
+                        ? 'bg-white shadow-sm text-primary-600' 
+                        : 'text-secondary-600 hover:text-secondary-800'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Ano</span>
+                    <span className="sm:hidden">A</span>
+                  </button>
+                </div>
+                
+                {/* Botão Hoje - Alinhado à direita */}
+                <button
+                  onClick={() => {
+                    const today = new Date();
+                    setCurrentDate(today);
+                    setSelectedDate(today);
+                    setView('month');
+                  }}
+                  className="px-2 py-1 text-xs font-medium border border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors rounded"
+                  title="Ir para hoje"
+                >
+                  <span className="hidden sm:inline">Hoje</span>
+                  <span className="sm:hidden">•</span>
+                </button>
+              </div>
+              
+              {/* Segunda linha: Navegação de Data - Linha inteira */}
+              <div className="flex items-center justify-between">
+                {/* Botão Anterior */}
+                <button
+                  onClick={() => navigateDate('prev')}
+                  className="p-1.5 hover:bg-secondary-100 rounded-md transition-colors"
+                  title="Período anterior"
+                >
+                  <svg className="w-4 h-4 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                {/* Título Central - Ocupa todo o espaço central */}
+                <div className="flex-1 text-center px-4">
+                  <h3 className="text-base font-medium text-secondary-900 truncate">
+                    {view === 'month' && format(currentDate, 'MMM yyyy', { locale: ptBR })}
+                    {view === 'week' && (
+                      <span className="hidden sm:inline text-sm">
+                        {`${format(startOfWeek(currentDate, { locale: ptBR }), 'dd MMM', { locale: ptBR })} - ${format(endOfWeek(currentDate, { locale: ptBR }), 'dd MMM', { locale: ptBR })}`}
+                      </span>
+                    )}
+                    {view === 'week' && (
+                      <span className="sm:hidden">
+                        {format(currentDate, 'MMM', { locale: ptBR })}
+                      </span>
+                    )}
+                    {view === 'year' && format(currentDate, 'yyyy', { locale: ptBR })}
+                  </h3>
+                </div>
+                
+                {/* Botão Próximo */}
+                <button
+                  onClick={() => navigateDate('next')}
+                  className="p-1.5 hover:bg-secondary-100 rounded-md transition-colors"
+                  title="Próximo período"
+                >
+                  <svg className="w-4 h-4 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
             <div className="flex-1 min-h-0">              {view === 'month' && <MonthView 
                 currentDate={currentDate} 
                 appointmentsByDate={appointmentsByDate}
@@ -1300,6 +1342,7 @@ const CategorizedAppointmentsView = ({ appointments, getServiceForAppointment, o
 const YearView = ({ currentDate, appointmentsByDate, selectedDate, setSelectedDate, setCurrentDate, setView }) => {
   const currentYear = currentDate.getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
+  
   // Calcular ranges dinâmicos para meses do ano
   const getYearMonthRanges = useMemo(() => {
     const monthCounts = months.map(month => {

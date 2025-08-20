@@ -75,3 +75,23 @@ O sistema agora tem:
 4. **UX melhorada** com feedback claro e prevenção de erros
 
 **Todos os testes passando e sistema funcionando conforme especificado!** 🚀
+
+---
+
+## ✅ Correção Final - Removido "Confirmar" para IN_PROGRESS Futuro
+
+**Problema identificado**: Agendamentos com status IN_PROGRESS no futuro (situação anômala) estavam mostrando o botão "Confirmar", o que não faz sentido lógico - se já está em progresso, significa que já foi implicitamente confirmado.
+
+**Solução aplicada**:
+- Removido `AppointmentStatus.CONFIRMED` das transições permitidas para `IN_PROGRESS` futuro em `getAllowedTransitions()`
+- Agora IN_PROGRESS futuro só permite cancelamentos: `CANCELLED_BY_CLIENT` e `CANCELLED_BY_ESTABLISHMENT`
+- Adicionado teste específico que confirma o comportamento correto
+
+**Resultado**:
+- ✅ IN_PROGRESS futuro só mostra botões de cancelamento
+- ✅ Todos os 16 testes passaram
+- ✅ Lógica de negócio agora é 100% consistente
+
+**Arquivo alterado**:
+- `src/services/statusValidationService.js` (linha ~503)
+- `src/services/statusValidationService.test.js` (novo teste)

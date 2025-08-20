@@ -144,7 +144,8 @@ export const TRANSITION_MESSAGES = {
     too_early_for_no_show: "Só é possível marcar não-comparecimento após o horário agendado.",
     too_early_for_in_progress: "Só é possível iniciar um atendimento 30 minutos antes do horário agendado.",
     too_late_for_in_progress: "Muito tarde para iniciar o atendimento. Use a opção de completar diretamente.",
-    appointment_passed_only_final_states: "Agendamentos que já passaram do horário só podem ser marcados como 'Concluído' ou 'Não Compareceu'."
+    appointment_passed_only_final_states: "Agendamentos que já passaram do horário só podem ser marcados como 'Concluído' ou 'Não Compareceu'.",
+    in_progress_passed_only_complete_cancel: "Atendimentos em andamento que já passaram do horário só podem ser concluídos ou cancelados."
   },
   
   // Mensagens de alerta (WARN)
@@ -260,6 +261,23 @@ export const validateStatusTransition = (appointment, newStatus) => {
           valid: false,
           type: 'error',
           message: TRANSITION_MESSAGES.error.appointment_passed_only_final_states
+        };
+      }
+    }
+    
+    // Para IN_PROGRESS que passou do horário, permitir COMPLETED e cancelamentos
+    else if (currentStatus === AppointmentStatus.IN_PROGRESS) {
+      // Se está tentando ir para COMPLETED ou cancelamentos, permitir mas continuar para verificação de confirmação
+      if (newStatus === AppointmentStatus.COMPLETED || 
+          newStatus === AppointmentStatus.CANCELLED_BY_CLIENT ||
+          newStatus === AppointmentStatus.CANCELLED_BY_ESTABLISHMENT) {
+        // NÃO retornar aqui - continuar para verificação de confirmação
+      } else {
+        // Se está tentando ir para qualquer outro status, bloquear
+        return {
+          valid: false,
+          type: 'error',
+          message: TRANSITION_MESSAGES.error.in_progress_passed_only_complete_cancel
         };
       }
     }
@@ -450,7 +468,7 @@ export const getAllowedTransitions = (appointment) => {
     
     // REGRAS TEMPORAIS CRÍTICAS - APLICAR PRIMEIRO
     if (isAppointmentPassed) {
-      // Se passou do horário, só permite COMPLETED e NO_SHOW para status não finais
+      // Para CONFIRMED, RESCHEDULED ou PENDING que passaram do horário, só permite COMPLETED e NO_SHOW
       if ((currentStatus === AppointmentStatus.CONFIRMED || 
            currentStatus === AppointmentStatus.RESCHEDULED ||
            currentStatus === AppointmentStatus.PENDING) &&
@@ -459,20 +477,44 @@ export const getAllowedTransitions = (appointment) => {
         return false;
       }
       
+      // Para IN_PROGRESS que passou do horário, só permite COMPLETED e cancelamentos
+      if (currentStatus === AppointmentStatus.IN_PROGRESS &&
+          (status !== AppointmentStatus.COMPLETED && 
+           status !== AppointmentStatus.CANCELLED_BY_CLIENT &&
+           status !== AppointmentStatus.CANCELLED_BY_ESTABLISHMENT)) {
+        return false;
+      }
+      
       // Para status RESCHEDULED que passou do horário, forçar apenas COMPLETED e NO_SHOW
       if (currentStatus === AppointmentStatus.RESCHEDULED) {
         return status === AppointmentStatus.COMPLETED || status === AppointmentStatus.NO_SHOW;
       }
+      
+      // Para status IN_PROGRESS que passou do horário, permitir COMPLETED e cancelamentos
+      if (currentStatus === AppointmentStatus.IN_PROGRESS) {
+        return status === AppointmentStatus.COMPLETED || 
+               status === AppointmentStatus.CANCELLED_BY_CLIENT ||
+               status === AppointmentStatus.CANCELLED_BY_ESTABLISHMENT;
+      }
     } else {
       // Se NÃO passou do horário, não pode marcar como NO_SHOW
       if (status === AppointmentStatus.NO_SHOW) return false;
+      
+      // REGRA ESPECIAL: IN_PROGRESS futuro é uma inconsistência - só permitir cancelar
+      if (currentStatus === AppointmentStatus.IN_PROGRESS) {
+        // Para IN_PROGRESS futuro (situação anômala), permitir apenas cancelar
+        // NÃO faz sentido "confirmar" um agendamento que já está em progresso
+        return status === AppointmentStatus.CANCELLED_BY_CLIENT ||
+               status === AppointmentStatus.CANCELLED_BY_ESTABLISHMENT;
+      }
     }
     
     // Verificar bloqueios na matriz de transições (apenas se não for caso temporal crítico)
     if (!isAppointmentPassed || 
         (currentStatus !== AppointmentStatus.CONFIRMED && 
          currentStatus !== AppointmentStatus.RESCHEDULED && 
-         currentStatus !== AppointmentStatus.PENDING)) {
+         currentStatus !== AppointmentStatus.PENDING &&
+         currentStatus !== AppointmentStatus.IN_PROGRESS)) {
       if (BLOCKED_TRANSITIONS[currentStatus]?.includes(status)) return false;
     }
     
@@ -513,8 +555,8 @@ export const getAllowedButtons = (appointment) => {
   
   // APLICAR REGRAS TEMPORAIS PRIMEIRO
   if (isAppointmentPassed) {
-    // Se passou do horário, agendamentos CONFIRMADOS, REAGENDADOS ou PENDENTES
-    // só podem ser marcados como CONCLUÍDO ou FALTA
+    // Se passou do horário, agendamentos CONFIRMADOS, REAGENDADOS, PENDENTES ou EM ANDAMENTO
+    // só podem ser marcados como CONCLUÍDO ou FALTA (exceto IN_PROGRESS que só pode CONCLUÍDO)
     if (currentStatus === AppointmentStatus.CONFIRMED || 
         currentStatus === AppointmentStatus.RESCHEDULED ||
         currentStatus === AppointmentStatus.PENDING) {
@@ -527,10 +569,35 @@ export const getAllowedButtons = (appointment) => {
       // Retornar apenas os botões temporais válidos - ignorar outras regras
       return buttonsToShow;
     }
+    
+    // Para IN_PROGRESS que passou do horário, pode concluir ou cancelar
+    if (currentStatus === AppointmentStatus.IN_PROGRESS) {
+      buttonsToShow = buttonsToShow.filter(status => 
+        status === AppointmentStatus.COMPLETED ||
+        status === AppointmentStatus.CANCELLED_BY_CLIENT ||
+        status === AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
+      );
+      
+      // Retornar apenas os botões temporais válidos - ignorar outras regras
+      return buttonsToShow;
+    }
   }
   
   // APLICAR REGRAS DE CONFLITO APENAS SE NÃO PASSOU DO HORÁRIO
   if (!isAppointmentPassed) {
+    // REGRA ESPECIAL: Agendamentos IN_PROGRESS futuros são uma inconsistência - só permitir cancelamentos
+    if (currentStatus === AppointmentStatus.IN_PROGRESS) {
+      // Para IN_PROGRESS futuro (situação anômala), permitir apenas cancelar
+      // NÃO faz sentido "confirmar" um agendamento que já está em progresso
+      buttonsToShow = buttonsToShow.filter(status => 
+        status === AppointmentStatus.CANCELLED_BY_CLIENT ||
+        status === AppointmentStatus.CANCELLED_BY_ESTABLISHMENT
+      );
+      
+      // Retornar apenas essas opções de correção
+      return buttonsToShow;
+    }
+    
     // REGRA 1: Não mostrar "Cancelar" quando há "Faltou" - eles não podem coexistir
     if (buttonsToShow.includes(AppointmentStatus.NO_SHOW)) {
       buttonsToShow = buttonsToShow.filter(status => 
